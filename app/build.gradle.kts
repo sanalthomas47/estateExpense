@@ -3,9 +3,9 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
 }
-
-apply(plugin = "com.google.dagger.hilt.android")
 
 android {
     namespace = "com.santhomach.estateexpense"
@@ -57,7 +57,7 @@ dependencies {
     // Room Database
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    annotationProcessor(libs.androidx.room.compiler)
+    ksp(libs.androidx.room.compiler)
 
     // Kotlin Serialization
     implementation(libs.kotlinx.serialization.json)
@@ -71,9 +71,10 @@ dependencies {
 
     // Hilt Dependency Injection
     implementation(libs.hilt.android)
-    annotationProcessor(libs.hilt.compiler)
+    ksp(libs.hilt.compiler)
 
     // Navigation Compose
+    implementation(libs.androidx.navigation.compose)
     implementation(libs.hilt.navigation.compose)
 
     // Testing

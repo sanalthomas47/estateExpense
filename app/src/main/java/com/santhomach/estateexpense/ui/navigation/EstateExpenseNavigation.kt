@@ -17,6 +17,7 @@ sealed class Screen(val route: String) {
     object Home : Screen("home")
     object Reports : Screen("reports")
     object Settings : Screen("settings")
+    object Payments : Screen("payments")
     object DailyExpense : Screen("daily_expense/{date}?expenseId={expenseId}") {
         fun createRoute(date: LocalDate, expenseId: Int? = null): String {
             return "daily_expense/${date}?expenseId=${expenseId ?: 0}"
@@ -42,16 +43,31 @@ fun EstateExpenseNavigation(
                 },
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
+                },
+                onNavigateToPayments = {
+                    navController.navigate(Screen.Payments.route)
                 }
             )
         }
 
         composable(Screen.Reports.route) {
-            ReportsScreen()
+            ReportsScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
         }
 
         composable(Screen.Settings.route) {
             SettingsScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.Payments.route) {
+            com.santhomach.estateexpense.ui.screens.WorkerPaymentScreen(
                 onNavigateBack = {
                     navController.popBackStack()
                 }

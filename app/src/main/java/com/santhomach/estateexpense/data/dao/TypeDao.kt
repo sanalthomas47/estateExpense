@@ -116,3 +116,28 @@ interface PermanentWorkerDao {
     @Query("SELECT * FROM permanent_workers ORDER BY name")
     suspend fun getAll(): List<PermanentWorker>
 }
+
+@Dao
+interface WorkTaskDao {
+
+    @Insert
+    suspend fun insert(task: com.santhomach.estateexpense.data.model.WorkTask): Long
+
+    @Update
+    suspend fun update(task: com.santhomach.estateexpense.data.model.WorkTask)
+
+    @Delete
+    suspend fun delete(task: com.santhomach.estateexpense.data.model.WorkTask)
+
+    @Query("SELECT * FROM work_tasks WHERE id = :id")
+    suspend fun getById(id: Int): com.santhomach.estateexpense.data.model.WorkTask?
+
+    @Query("SELECT * FROM work_tasks WHERE isActive = 1 ORDER BY taskName")
+    suspend fun getAllActive(): List<com.santhomach.estateexpense.data.model.WorkTask>
+
+    @Query("SELECT * FROM work_tasks WHERE isActive = 1 ORDER BY taskName")
+    fun getAllActiveFlow(): Flow<List<com.santhomach.estateexpense.data.model.WorkTask>>
+
+    @Query("SELECT * FROM work_tasks ORDER BY taskName")
+    suspend fun getAll(): List<com.santhomach.estateexpense.data.model.WorkTask>
+}

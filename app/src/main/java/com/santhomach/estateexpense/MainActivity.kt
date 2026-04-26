@@ -36,6 +36,11 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun DefaultPreview() {
     EstateExpenseTheme {
-        EstateExpenseNavigation()
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            EstateExpenseNavigation()
+        }
     }
 }

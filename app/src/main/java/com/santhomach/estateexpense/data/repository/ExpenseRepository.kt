@@ -20,6 +20,8 @@ class ExpenseRepository @Inject constructor(
     private val permanentWorkerDao = database.permanentWorkerDao()
     private val settlementDao = database.weeklySettlementDao()
     private val balanceDao = database.excessBalanceDao()
+    private val taskDao = database.workTaskDao()
+    private val paymentDao = database.workerPaymentDao()
 
     // Daily Expense Operations
     suspend fun insertDailyExpense(expense: DailyExpense): Long {
@@ -161,6 +163,36 @@ class ExpenseRepository @Inject constructor(
         return totalStr?.toBigDecimalOrNull() ?: BigDecimal.ZERO
     }
 
+    // Work Task Operations
+    suspend fun insertWorkTask(task: WorkTask): Long {
+        return taskDao.insert(task)
+    }
+
+    suspend fun getAllActiveWorkTasks(): List<WorkTask> {
+        return taskDao.getAllActive()
+    }
+
+    fun getAllActiveWorkTasksFlow(): Flow<List<WorkTask>> {
+        return taskDao.getAllActiveFlow()
+    }
+
+    // Worker Payment Operations
+    suspend fun insertWorkerPayment(payment: WorkerPayment): Long {
+        return paymentDao.insert(payment)
+    }
+
+    fun getPaymentsByWorkerFlow(workerId: Int): Flow<List<WorkerPayment>> {
+        return paymentDao.getPaymentsByWorkerFlow(workerId)
+    }
+
+    fun getAllPaymentsFlow(): Flow<List<WorkerPayment>> {
+        return paymentDao.getAllPaymentsFlow()
+    }
+
+    fun getPaymentsByDateRangeFlow(startDate: String, endDate: String): Flow<List<WorkerPayment>> {
+        return paymentDao.getPaymentsByDateRangeFlow(startDate, endDate)
+    }
+
     // Analytics and Reports
     fun getDailyExpenseSummaryFlow(startDate: String, endDate: String): Flow<ExpenseSummary> {
         return getDailyExpensesByDateRangeFlow(startDate, endDate).map { expenses ->
@@ -238,6 +270,23 @@ class ExpenseRepository @Inject constructor(
         for (type in defaultWorkerTypes) {
             if (workerTypeDao.getAllActive().none { it.workerTypeName == type.workerTypeName }) {
                 workerTypeDao.insert(type)
+            }
+        }
+
+        // Initialize default work tasks
+        val defaultTasks = listOf(
+            WorkTask(taskName = "Spraying", description = "Spraying pesticides/fertilizers"),
+            WorkTask(taskName = "Weeding", description = "Removing weeds"),
+            WorkTask(taskName = "Harvesting", description = "Harvesting crops"),
+            WorkTask(taskName = "Pruning", description = "Pruning plants"),
+            WorkTask(taskName = "Planting", description = "Planting new saplings"),
+            WorkTask(taskName = "Drying", description = "Drying cardamom/pepper"),
+            WorkTask(taskName = "Other", description = "Other farm work")
+        )
+
+        for (task in defaultTasks) {
+            if (taskDao.getAllActive().none { it.taskName == task.taskName }) {
+                taskDao.insert(task)
             }
         }
     }

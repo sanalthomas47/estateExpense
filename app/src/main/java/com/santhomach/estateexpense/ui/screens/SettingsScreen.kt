@@ -6,6 +6,7 @@ import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -13,12 +14,22 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.santhomach.estateexpense.ui.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
 
+import androidx.compose.ui.platform.LocalInspectionMode
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit = {},
-    viewModel: SettingsViewModel = hiltViewModel()
+    viewModelArg: SettingsViewModel? = null
 ) {
+    if (LocalInspectionMode.current && viewModelArg == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Settings Screen Preview")
+        }
+        return
+    }
+
+    val viewModel: SettingsViewModel = viewModelArg ?: hiltViewModel()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsState()

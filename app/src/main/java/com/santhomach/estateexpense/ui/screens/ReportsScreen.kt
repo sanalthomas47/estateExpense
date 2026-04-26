@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,11 +18,23 @@ import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+import androidx.compose.ui.platform.LocalInspectionMode
+import com.santhomach.estateexpense.ui.viewmodel.ReportsUiState
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsScreen(
-    viewModel: ReportsViewModel = hiltViewModel()
+    onNavigateBack: () -> Unit = {},
+    viewModelArg: ReportsViewModel? = null
 ) {
+    if (LocalInspectionMode.current && viewModelArg == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Reports Screen Preview")
+        }
+        return
+    }
+
+    val viewModel: ReportsViewModel = viewModelArg ?: hiltViewModel()
     val uiState by viewModel.uiState.collectAsState()
     val dateRange by viewModel.dateRange.collectAsState()
     val dailySummary by viewModel.dailySummary.collectAsState()
@@ -34,6 +47,11 @@ fun ReportsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Reports & Analytics") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
                 actions = {
                     IconButton(onClick = { viewModel.refreshData() }) {
                         if (uiState.isRefreshing) {

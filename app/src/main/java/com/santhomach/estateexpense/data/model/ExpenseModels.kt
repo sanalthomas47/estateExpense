@@ -78,6 +78,20 @@ data class WorkerType(
 )
 
 /**
+ * Predefined work tasks (e.g., Spraying, Weeding, Harvesting)
+ */
+@Entity(tableName = "work_tasks")
+@Serializable
+data class WorkTask(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+    val taskName: String,
+    val description: String = "",
+    val isActive: Boolean = true,
+    val createdAt: String = LocalDateTime.now().toString()
+)
+
+/**
  * Main daily expense/income record
  */
 @Entity(
@@ -144,6 +158,9 @@ data class DailyExpense(
     @Serializable(with = BigDecimalSerializer::class)
     val excessBalance: BigDecimal = BigDecimal.ZERO,
 
+    // Worker groups with tasks and comments (stored as JSON)
+    val workerGroups: String = "[]", // JSON array of WorkerGroupEntry
+
     // Metadata
     val managerId: Int? = null,
     val comments: String = "",
@@ -160,6 +177,18 @@ data class DailyExpense(
         return totalIncome - totalExpenses
     }
 }
+
+@Serializable
+data class WorkerGroupEntry(
+    val workerTypeId: Int,
+    val workerTypeName: String,
+    val count: Int,
+    @Serializable(with = BigDecimalSerializer::class)
+    val wagePerDay: BigDecimal,
+    val taskPerformed: String,
+    val comments: String = "",
+    val addedAt: String = LocalDateTime.now().toString()
+)
 
 /**
  * Other expense entry (sub-record of DailyExpense)
@@ -267,4 +296,27 @@ data class ExcessBalance(
     val isSettled: Boolean = false,
 
     val createdBy: String = "system"
+)
+
+/**
+ * Worker payments (e.g., Monthly Manager Salary)
+ */
+@Entity(
+    tableName = "worker_payments",
+    indices = [Index(value = ["workerId"]), Index(value = ["paymentDate"])]
+)
+@Serializable
+data class WorkerPayment(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+    val workerId: Int,
+    val workerName: String,
+    @Serializable(with = BigDecimalSerializer::class)
+    val amount: BigDecimal,
+    val paymentDate: String, // ISO format
+    val periodStart: String? = null,
+    val periodEnd: String? = null,
+    val paymentType: String = "MONTHLY", // "MONTHLY", "WEEKLY", "ADVANCE"
+    val notes: String = "",
+    val createdAt: String = LocalDateTime.now().toString()
 )

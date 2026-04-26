@@ -13,6 +13,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.santhomach.estateexpense.ui.viewmodel.ReportsViewModel
+import androidx.compose.ui.platform.LocalInspectionMode
+import com.santhomach.estateexpense.data.model.DailyExpense
+import com.santhomach.estateexpense.data.repository.ExpenseSummary
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -23,12 +26,47 @@ fun HomeScreen(
     onNavigateToExpenseEntry: (LocalDate) -> Unit = {},
     onNavigateToReports: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
-    viewModel: ReportsViewModel = hiltViewModel()
+    onNavigateToPayments: () -> Unit = {},
+    viewModel: ReportsViewModel? = null
 ) {
-    val recentExpenses by viewModel.recentExpenses.collectAsState()
-    val dailySummary by viewModel.dailySummary.collectAsState()
+    if (LocalInspectionMode.current && viewModel == null) {
+        HomeScreenContent(
+            recentExpenses = emptyList(),
+            dailySummary = ExpenseSummary(),
+            onNavigateToExpenseEntry = onNavigateToExpenseEntry,
+            onNavigateToReports = onNavigateToReports,
+            onNavigateToSettings = onNavigateToSettings,
+            onNavigateToPayments = onNavigateToPayments
+        )
+        return
+    }
 
+    val actualViewModel: ReportsViewModel = viewModel ?: hiltViewModel()
+    val recentExpenses by actualViewModel.recentExpenses.collectAsState()
+    val dailySummary by actualViewModel.dailySummary.collectAsState()
+
+    HomeScreenContent(
+        recentExpenses = recentExpenses,
+        dailySummary = dailySummary,
+        onNavigateToExpenseEntry = onNavigateToExpenseEntry,
+        onNavigateToReports = onNavigateToReports,
+        onNavigateToSettings = onNavigateToSettings,
+        onNavigateToPayments = onNavigateToPayments
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeScreenContent(
+    recentExpenses: List<DailyExpense>,
+    dailySummary: ExpenseSummary,
+    onNavigateToExpenseEntry: (LocalDate) -> Unit,
+    onNavigateToReports: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onNavigateToPayments: () -> Unit
+) {
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
                 title = { Text("Estate Expense Tracker") },
@@ -47,13 +85,13 @@ fun HomeScreen(
             }
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+        Box(modifier = Modifier.padding(padding)) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             // Quick Stats Card
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
@@ -122,11 +160,23 @@ fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        Button(
-                            onClick = onNavigateToReports,
-                            modifier = Modifier.fillMaxWidth()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("View Reports")
+                            Button(
+                                onClick = onNavigateToReports,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Reports")
+                            }
+
+                            Button(
+                                onClick = onNavigateToPayments,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Payments")
+                            }
                         }
                     }
                 }
@@ -241,6 +291,7 @@ fun HomeScreen(
             }
         }
     }
+}
 }
 
 @Composable
