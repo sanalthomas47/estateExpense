@@ -1,0 +1,89 @@
+package com.santhomach.estateexpense.ui.navigation
+
+import androidx.compose.runtime.Composable
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.santhomach.estateexpense.ui.screens.DailyExpenseScreen
+import com.santhomach.estateexpense.ui.screens.HomeScreen
+import com.santhomach.estateexpense.ui.screens.ReportsScreen
+import com.santhomach.estateexpense.ui.screens.SettingsScreen
+import java.time.LocalDate
+
+sealed class Screen(val route: String) {
+    object Home : Screen("home")
+    object Reports : Screen("reports")
+    object Settings : Screen("settings")
+    object DailyExpense : Screen("daily_expense/{date}?expenseId={expenseId}") {
+        fun createRoute(date: LocalDate, expenseId: Int? = null): String {
+            return "daily_expense/${date}?expenseId=${expenseId ?: 0}"
+        }
+    }
+}
+
+@Composable
+fun EstateExpenseNavigation(
+    navController: NavHostController = rememberNavController()
+) {
+    NavHost(
+        navController = navController,
+        startDestination = Screen.Home.route
+    ) {
+        composable(Screen.Home.route) {
+            HomeScreen(
+                onNavigateToExpenseEntry = { date ->
+                    navController.navigate(Screen.DailyExpense.createRoute(date))
+                },
+                onNavigateToReports = {
+                    navController.navigate(Screen.Reports.route)
+                },
+                onNavigateToSettings = {
+                    navController.navigate(Screen.Settings.route)
+                }
+            )
+        }
+
+        composable(Screen.Reports.route) {
+            ReportsScreen()
+        }
+
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(
+            route = Screen.DailyExpense.route,
+            arguments = listOf(
+                navArgument("date") { type = NavType.StringType },
+                navArgument("expenseId") {
+                    type = NavType.IntType
+                    defaultValue = 0
+                }
+            )
+        ) { backStackEntry ->
+            val dateString = backStackEntry.arguments?.getString("date") ?: LocalDate.now().toString()
+            val expenseId = backStackEntry.arguments?.getInt("expenseId") ?: 0
+
+            val date = try {
+                LocalDate.parse(dateString)
+            } catch (e: Exception) {
+                LocalDate.now()
+            }
+
+            DailyExpenseScreen(
+                date = date,
+                expenseId = if (expenseId > 0) expenseId else null,
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+    }
+}
