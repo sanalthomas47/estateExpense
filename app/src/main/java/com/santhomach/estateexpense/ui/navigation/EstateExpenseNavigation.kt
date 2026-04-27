@@ -18,6 +18,7 @@ sealed class Screen(val route: String) {
     object Reports : Screen("reports")
     object Settings : Screen("settings")
     object Payments : Screen("payments")
+    object WeeklyFunds : Screen("weekly_funds")
     object DailyExpense : Screen("daily_expense/{date}?expenseId={expenseId}") {
         fun createRoute(date: LocalDate, expenseId: Int? = null): String {
             return "daily_expense/${date}?expenseId=${expenseId ?: 0}"
@@ -35,8 +36,8 @@ fun EstateExpenseNavigation(
     ) {
         composable(Screen.Home.route) {
             HomeScreen(
-                onNavigateToExpenseEntry = { date ->
-                    navController.navigate(Screen.DailyExpense.createRoute(date))
+                onNavigateToExpenseEntry = { date, expenseId ->
+                    navController.navigate(Screen.DailyExpense.createRoute(date, expenseId))
                 },
                 onNavigateToReports = {
                     navController.navigate(Screen.Reports.route)
@@ -46,6 +47,9 @@ fun EstateExpenseNavigation(
                 },
                 onNavigateToPayments = {
                     navController.navigate(Screen.Payments.route)
+                },
+                onNavigateToWeeklyFunds = {
+                    navController.navigate(Screen.WeeklyFunds.route)
                 }
             )
         }
@@ -54,6 +58,9 @@ fun EstateExpenseNavigation(
             ReportsScreen(
                 onNavigateBack = {
                     navController.popBackStack()
+                },
+                onNavigateToExpenseEntry = { date, expenseId ->
+                    navController.navigate(Screen.DailyExpense.createRoute(date, expenseId))
                 }
             )
         }
@@ -68,6 +75,14 @@ fun EstateExpenseNavigation(
 
         composable(Screen.Payments.route) {
             com.santhomach.estateexpense.ui.screens.WorkerPaymentScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.WeeklyFunds.route) {
+            com.santhomach.estateexpense.ui.screens.WeeklyFundsScreen(
                 onNavigateBack = {
                     navController.popBackStack()
                 }

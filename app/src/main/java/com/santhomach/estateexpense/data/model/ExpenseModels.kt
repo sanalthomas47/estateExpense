@@ -158,6 +158,10 @@ data class DailyExpense(
     @Serializable(with = BigDecimalSerializer::class)
     val excessBalance: BigDecimal = BigDecimal.ZERO,
 
+    // Advance amount paid on this day
+    @Serializable(with = BigDecimalSerializer::class)
+    val advanceAmount: BigDecimal = BigDecimal.ZERO,
+
     // Worker groups with tasks and comments (stored as JSON)
     val workerGroups: String = "[]", // JSON array of WorkerGroupEntry
 
@@ -173,7 +177,7 @@ data class DailyExpense(
 ) {
     // Convenience function to calculate net (income - expenses)
     fun calculateNetAmount(): BigDecimal {
-        val totalExpenses = totalLaborCost + totalOvertimeCost + totalOtherExpensesCost
+        val totalExpenses = totalLaborCost + totalOvertimeCost + totalOtherExpensesCost + advanceAmount
         return totalIncome - totalExpenses
     }
 }
@@ -185,10 +189,19 @@ data class WorkerGroupEntry(
     val count: Int,
     @Serializable(with = BigDecimalSerializer::class)
     val wagePerDay: BigDecimal,
+    val overtimeHours: Int = 0,
+    @Serializable(with = BigDecimalSerializer::class)
+    val overtimeWagePerHour: BigDecimal = BigDecimal.ZERO,
     val taskPerformed: String,
     val comments: String = "",
     val addedAt: String = LocalDateTime.now().toString()
-)
+) {
+    fun calculateTotalGroupCost(): BigDecimal {
+        val baseWage = wagePerDay * count.toBigDecimal()
+        val overtimeWage = (overtimeWagePerHour * overtimeHours.toBigDecimal()) * count.toBigDecimal()
+        return baseWage + overtimeWage
+    }
+}
 
 /**
  * Other expense entry (sub-record of DailyExpense)
@@ -210,8 +223,13 @@ data class OtherExpenseEntry(
 data class IncomeEntry(
     val incomeTypeId: Int,
     val typeName: String,
+    val weight: Double = 0.0,
     @Serializable(with = BigDecimalSerializer::class)
-    val amount: BigDecimal,
+    val pricePerKilo: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalSerializer::class)
+    val transportationCharge: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalSerializer::class)
+    val amount: BigDecimal, // Total amount = (weight * pricePerKilo) - transportationCharge (usually)
     val notes: String = "",
     val addedAt: String = LocalDateTime.now().toString()
 )
@@ -296,6 +314,24 @@ data class ExcessBalance(
     val isSettled: Boolean = false,
 
     val createdBy: String = "system"
+)
+
+/**
+ * Weekly funds received from owner/office
+ */
+@Entity(
+    tableName = "weekly_funds",
+    indices = [Index(value = ["weekStartDate"])]
+)
+@Serializable
+data class WeeklyFunds(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+    val weekStartDate: String, // ISO format (typically Monday)
+    @Serializable(with = BigDecimalSerializer::class)
+    val amountReceived: BigDecimal,
+    val notes: String = "",
+    val createdAt: String = LocalDateTime.now().toString()
 )
 
 /**

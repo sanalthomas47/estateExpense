@@ -54,6 +54,52 @@ class WorkerPaymentViewModel @Inject constructor(
         }
     }
 
+    fun updatePayment(
+        id: Int,
+        workerId: Int,
+        amount: BigDecimal,
+        date: LocalDate,
+        paymentType: String,
+        notes: String
+    ) {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isSaving = true) }
+                val existingPayment = allPayments.value.find { it.id == id }
+                val worker = permanentWorkers.value.find { it.id == workerId }
+                existingPayment?.let {
+                    val updatedPayment = it.copy(
+                        workerId = workerId,
+                        workerName = worker?.name ?: "Unknown",
+                        amount = amount,
+                        paymentDate = date.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                        paymentType = paymentType,
+                        notes = notes
+                    )
+                    repository.updateWorkerPayment(updatedPayment)
+                    _uiState.update { it.copy(isSaving = false, successMessage = "Payment updated successfully") }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isSaving = false, error = e.message) }
+            }
+        }
+    }
+
+    fun deletePayment(id: Int) {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isDeleting = true) }
+                val existingPayment = allPayments.value.find { it.id == id }
+                existingPayment?.let {
+                    repository.deleteWorkerPayment(it)
+                }
+                _uiState.update { it.copy(isDeleting = false, successMessage = "Payment deleted successfully") }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isDeleting = false, error = e.message) }
+            }
+        }
+    }
+
     fun clearMessages() {
         _uiState.update { it.copy(error = null, successMessage = null) }
     }
@@ -61,6 +107,7 @@ class WorkerPaymentViewModel @Inject constructor(
 
 data class WorkerPaymentUiState(
     val isSaving: Boolean = false,
+    val isDeleting: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null
 )

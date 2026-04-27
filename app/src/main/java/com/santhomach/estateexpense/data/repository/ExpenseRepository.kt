@@ -22,6 +22,7 @@ class ExpenseRepository @Inject constructor(
     private val balanceDao = database.excessBalanceDao()
     private val taskDao = database.workTaskDao()
     private val paymentDao = database.workerPaymentDao()
+    private val fundsDao = database.weeklyFundsDao()
 
     // Daily Expense Operations
     suspend fun insertDailyExpense(expense: DailyExpense): Long {
@@ -181,6 +182,14 @@ class ExpenseRepository @Inject constructor(
         return paymentDao.insert(payment)
     }
 
+    suspend fun updateWorkerPayment(payment: WorkerPayment) {
+        paymentDao.update(payment)
+    }
+
+    suspend fun deleteWorkerPayment(payment: WorkerPayment) {
+        paymentDao.delete(payment)
+    }
+
     fun getPaymentsByWorkerFlow(workerId: Int): Flow<List<WorkerPayment>> {
         return paymentDao.getPaymentsByWorkerFlow(workerId)
     }
@@ -193,6 +202,23 @@ class ExpenseRepository @Inject constructor(
         return paymentDao.getPaymentsByDateRangeFlow(startDate, endDate)
     }
 
+    // Weekly Funds Operations
+    suspend fun insertWeeklyFunds(funds: WeeklyFunds): Long {
+        return fundsDao.insert(funds)
+    }
+
+    suspend fun updateWeeklyFunds(funds: WeeklyFunds) {
+        fundsDao.update(funds)
+    }
+
+    suspend fun deleteWeeklyFunds(funds: WeeklyFunds) {
+        fundsDao.delete(funds)
+    }
+
+    fun getAllWeeklyFundsFlow(): Flow<List<WeeklyFunds>> {
+        return fundsDao.getAllFlow()
+    }
+
     // Analytics and Reports
     fun getDailyExpenseSummaryFlow(startDate: String, endDate: String): Flow<ExpenseSummary> {
         return getDailyExpensesByDateRangeFlow(startDate, endDate).map { expenses ->
@@ -201,6 +227,7 @@ class ExpenseRepository @Inject constructor(
                 totalLaborCost = expenses.sumOf { it.totalLaborCost },
                 totalOvertimeCost = expenses.sumOf { it.totalOvertimeCost },
                 totalOtherExpenses = expenses.sumOf { it.totalOtherExpensesCost },
+                totalAdvanceAmount = expenses.sumOf { it.advanceAmount },
                 totalExcessBalance = expenses.sumOf { it.excessBalance },
                 netAmount = expenses.sumOf { it.calculateNetAmount() },
                 totalDays = expenses.size,
@@ -298,6 +325,7 @@ data class ExpenseSummary(
     val totalLaborCost: BigDecimal = BigDecimal.ZERO,
     val totalOvertimeCost: BigDecimal = BigDecimal.ZERO,
     val totalOtherExpenses: BigDecimal = BigDecimal.ZERO,
+    val totalAdvanceAmount: BigDecimal = BigDecimal.ZERO,
     val totalExcessBalance: BigDecimal = BigDecimal.ZERO,
     val netAmount: BigDecimal = BigDecimal.ZERO,
     val totalDays: Int = 0,
@@ -310,6 +338,7 @@ data class WeeklyExpenseSummary(
     val totalLaborCost: BigDecimal = BigDecimal.ZERO,
     val totalOvertimeCost: BigDecimal = BigDecimal.ZERO,
     val totalOtherExpenses: BigDecimal = BigDecimal.ZERO,
+    val totalAdvanceAmount: BigDecimal = BigDecimal.ZERO,
     val totalExcessBalance: BigDecimal = BigDecimal.ZERO,
     val netAmount: BigDecimal = BigDecimal.ZERO,
     val totalWeeks: Int = 0,

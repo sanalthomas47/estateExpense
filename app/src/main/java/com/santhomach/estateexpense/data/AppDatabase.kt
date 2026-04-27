@@ -12,6 +12,7 @@ import com.santhomach.estateexpense.data.dao.WeeklySettlementDao
 import com.santhomach.estateexpense.data.dao.ExcessBalanceDao
 import com.santhomach.estateexpense.data.dao.WorkTaskDao
 import com.santhomach.estateexpense.data.dao.WorkerPaymentDao
+import com.santhomach.estateexpense.data.dao.WeeklyFundsDao
 import com.santhomach.estateexpense.data.model.DailyExpense
 import com.santhomach.estateexpense.data.model.ExpenseType
 import com.santhomach.estateexpense.data.model.IncomeType
@@ -34,9 +35,10 @@ import androidx.room.TypeConverters
         WeeklySettlement::class,
         ExcessBalance::class,
         WorkTask::class,
-        WorkerPayment::class
+        WorkerPayment::class,
+        com.santhomach.estateexpense.data.model.WeeklyFunds::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(RoomConverters::class)
@@ -51,6 +53,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun excessBalanceDao(): ExcessBalanceDao
     abstract fun workTaskDao(): WorkTaskDao
     abstract fun workerPaymentDao(): WorkerPaymentDao
+    abstract fun weeklyFundsDao(): WeeklyFundsDao
 
     companion object {
         @Volatile

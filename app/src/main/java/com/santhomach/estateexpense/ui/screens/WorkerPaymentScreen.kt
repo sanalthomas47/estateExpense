@@ -7,8 +7,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.santhomach.estateexpense.data.model.PermanentWorker
+import com.santhomach.estateexpense.data.model.WorkerPayment
 import com.santhomach.estateexpense.ui.viewmodel.WorkerPaymentViewModel
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -32,6 +35,10 @@ fun WorkerPaymentScreen(
     val payments by viewModel.allPayments.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var selectedPaymentForEdit by remember { mutableStateOf<WorkerPayment?>(null) }
+    var selectedPaymentForDelete by remember { mutableStateOf<WorkerPayment?>(null) }
 
     Scaffold(
         topBar = {
@@ -39,7 +46,12 @@ fun WorkerPaymentScreen(
                 title = { Text("Worker Payments") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { /* All data is auto-saved */ }) {
+                        Icon(Icons.Filled.Save, contentDescription = "Save")
                     }
                 }
             )
@@ -100,6 +112,28 @@ fun WorkerPaymentScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+
+                        // Action buttons for edit/delete
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(onClick = {
+                                selectedPaymentForEdit = payment
+                                showEditDialog = true
+                            }) {
+                                Text("Edit")
+                            }
+                            TextButton(
+                                onClick = {
+                                    selectedPaymentForDelete = payment
+                                    showDeleteDialog = true
+                                },
+                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                            ) {
+                                Text("Delete")
+                            }
+                        }
                     }
                 }
             }
@@ -125,6 +159,55 @@ fun WorkerPaymentScreen(
         )
     }
 
+    selectedPaymentForEdit?.let { payment ->
+        if (showEditDialog) {
+            RecordPaymentDialog(
+                workers = workers,
+                onDismiss = {
+                    showEditDialog = false
+                    selectedPaymentForEdit = null
+                },
+                onConfirm = { workerId, amount, date, type, notes ->
+                    viewModel.updatePayment(payment.id, workerId, amount, date, type, notes)
+                    showEditDialog = false
+                    selectedPaymentForEdit = null
+                },
+                initialWorkerId = payment.workerId,
+                initialAmount = payment.amount.toString(),
+                initialDate = LocalDate.parse(payment.paymentDate),
+                initialType = payment.paymentType,
+                initialNotes = payment.notes
+            )
+        }
+    }
+
+    selectedPaymentForDelete?.let { payment ->
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("Delete Payment") },
+                text = { Text("Are you sure you want to delete the payment record for ${payment.workerName} (${payment.amount}₹ on ${LocalDate.parse(payment.paymentDate).format(DateTimeFormatter.ofPattern("dd MMM yyyy"))})?") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.deletePayment(payment.id)
+                            showDeleteDialog = false
+                            selectedPaymentForDelete = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Delete")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+    }
+
     // Messages
     LaunchedEffect(uiState.successMessage, uiState.error) {
         if (uiState.successMessage != null || uiState.error != null) {
@@ -137,15 +220,20 @@ fun WorkerPaymentScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordPaymentDialog(
-    workers: List<com.santhomach.estateexpense.data.model.PermanentWorker>,
+    workers: List<PermanentWorker>,
     onDismiss: () -> Unit,
-    onConfirm: (Int, BigDecimal, LocalDate, String, String) -> Unit
+    onConfirm: (Int, BigDecimal, LocalDate, String, String) -> Unit,
+    initialWorkerId: Int = 0,
+    initialAmount: String = "",
+    initialDate: LocalDate = LocalDate.now(),
+    initialType: String = "MONTHLY",
+    initialNotes: String = ""
 ) {
-    var selectedWorkerId by remember { mutableStateOf(workers.firstOrNull()?.id ?: 0) }
-    var amount by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf(LocalDate.now()) }
-    var paymentType by remember { mutableStateOf("MONTHLY") }
-    var notes by remember { mutableStateOf("") }
+    var selectedWorkerId by remember { mutableStateOf(initialWorkerId) }
+    var amount by remember { mutableStateOf(initialAmount) }
+    var date by remember { mutableStateOf(initialDate) }
+    var paymentType by remember { mutableStateOf(initialType) }
+    var notes by remember { mutableStateOf(initialNotes) }
 
     val paymentTypes = listOf("MONTHLY", "WEEKLY", "ADVANCE", "BONUS")
 

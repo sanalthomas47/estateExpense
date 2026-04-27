@@ -144,13 +144,37 @@ class ReportsViewModel @Inject constructor(
     fun getExpenseTrend(expenses: List<DailyExpense>): List<DailyTrend> {
         return expenses
             .sortedBy { it.date }
-            .map { DailyTrend(it.date, it.totalLaborCost + it.totalOvertimeCost + it.totalOtherExpensesCost) }
+            .map { DailyTrend(it.date, it.totalLaborCost + it.totalOvertimeCost + it.totalOtherExpensesCost + it.advanceAmount) }
     }
 
     fun getProfitLossTrend(expenses: List<DailyExpense>): List<DailyTrend> {
         return expenses
             .sortedBy { it.date }
             .map { DailyTrend(it.date, it.calculateNetAmount()) }
+    }
+
+    fun getIncomeBreakdown(expenses: List<DailyExpense>): List<IncomeBreakdown> {
+        val breakdownMap = mutableMapOf<String, IncomeBreakdown>()
+
+        expenses.forEach { expense ->
+            try {
+                val incomeEntries = kotlinx.serialization.json.Json.decodeFromString(
+                    kotlinx.serialization.builtins.ListSerializer(com.santhomach.estateexpense.data.model.IncomeEntry.serializer()), 
+                    expense.incomeEntries
+                )
+                incomeEntries.forEach { entry ->
+                    val current = breakdownMap.getOrDefault(entry.typeName, IncomeBreakdown(entry.typeName))
+                    breakdownMap[entry.typeName] = current.copy(
+                        totalAmount = current.totalAmount + entry.amount,
+                        totalWeight = current.totalWeight + entry.weight
+                    )
+                }
+            } catch (e: Exception) {
+                // Skip
+            }
+        }
+
+        return breakdownMap.values.sortedByDescending { it.totalAmount }
     }
 }
 
@@ -179,4 +203,10 @@ data class CategoryExpense(
 data class DailyTrend(
     val date: String,
     val amount: java.math.BigDecimal
+)
+
+data class IncomeBreakdown(
+    val commodityName: String,
+    val totalAmount: java.math.BigDecimal = java.math.BigDecimal.ZERO,
+    val totalWeight: Double = 0.0
 )

@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,6 +26,7 @@ import com.santhomach.estateexpense.ui.viewmodel.ReportsUiState
 @Composable
 fun ReportsScreen(
     onNavigateBack: () -> Unit = {},
+    onNavigateToExpenseEntry: (LocalDate, Int?) -> Unit = { _, _ -> },
     viewModelArg: ReportsViewModel? = null
 ) {
     if (LocalInspectionMode.current && viewModelArg == null) {
@@ -53,6 +55,9 @@ fun ReportsScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { /* Could implement export to CSV/PDF */ }) {
+                        Icon(Icons.Filled.Save, contentDescription = "Save Report")
+                    }
                     IconButton(onClick = { viewModel.refreshData() }) {
                         if (uiState.isRefreshing) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp))
@@ -145,6 +150,7 @@ fun ReportsScreen(
                         SummaryRow("Total Income", "₹${dailySummary.totalIncome}")
                         SummaryRow("Total Labor Cost", "₹${dailySummary.totalLaborCost}")
                         SummaryRow("Total Overtime Cost", "₹${dailySummary.totalOvertimeCost}")
+                        SummaryRow("Total Advance Paid", "₹${dailySummary.totalAdvanceAmount}")
                         SummaryRow("Total Other Expenses", "₹${dailySummary.totalOtherExpenses}")
                         SummaryRow("Total Excess Balance", "₹${dailySummary.totalExcessBalance}")
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
@@ -169,6 +175,7 @@ fun ReportsScreen(
                         SummaryRow("Total Income", "₹${weeklySummary.totalIncome}")
                         SummaryRow("Total Labor Cost", "₹${weeklySummary.totalLaborCost}")
                         SummaryRow("Total Overtime Cost", "₹${weeklySummary.totalOvertimeCost}")
+                        SummaryRow("Total Advance Paid", "₹${weeklySummary.totalAdvanceAmount}")
                         SummaryRow("Total Other Expenses", "₹${weeklySummary.totalOtherExpenses}")
                         SummaryRow("Total Excess Balance", "₹${weeklySummary.totalExcessBalance}")
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
@@ -222,6 +229,55 @@ fun ReportsScreen(
                 }
             }
 
+            // Income Breakdown
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Income Breakdown",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        val incomeBreakdown = viewModel.getIncomeBreakdown(filteredExpenses)
+                        if (incomeBreakdown.isEmpty()) {
+                            Text(
+                                text = "No income data available",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        } else {
+                            incomeBreakdown.forEach { item ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = item.commodityName,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        Text(
+                                            text = "Total Weight: ${item.totalWeight} kg",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                    }
+                                    Text(
+                                        text = "₹${item.totalAmount}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                if (item != incomeBreakdown.last()) {
+                                    Divider(modifier = Modifier.padding(vertical = 4.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Recent Expenses List
             item {
                 Text(
@@ -234,7 +290,12 @@ fun ReportsScreen(
             items(filteredExpenses.take(20)) { expense ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    onClick = { /* Navigate to expense detail */ }
+                    onClick = { 
+                        onNavigateToExpenseEntry(
+                            try { LocalDate.parse(expense.date) } catch(e: Exception) { LocalDate.now() },
+                            expense.id
+                        )
+                    }
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(

@@ -107,7 +107,15 @@ class DailyExpenseViewModel @Inject constructor(
         recalculateTotals()
     }
 
-    fun addWorkerGroup(workerTypeId: Int, count: Int, wage: BigDecimal, task: String, comments: String = "") {
+    fun addWorkerGroup(
+        workerTypeId: Int, 
+        count: Int, 
+        wage: BigDecimal, 
+        overtimeHours: Int,
+        overtimeWagePerHour: BigDecimal,
+        task: String, 
+        comments: String = ""
+    ) {
         _currentExpense.update { expense ->
             expense?.let {
                 val currentGroups = parseWorkerGroups(it.workerGroups)
@@ -116,15 +124,15 @@ class DailyExpenseViewModel @Inject constructor(
                     workerTypeName = workerTypes.value.find { type -> type.id == workerTypeId }?.workerTypeName ?: "Unknown",
                     count = count,
                     wagePerDay = wage,
+                    overtimeHours = overtimeHours,
+                    overtimeWagePerHour = overtimeWagePerHour,
                     taskPerformed = task,
                     comments = comments
                 )
                 val updatedGroups = currentGroups + newEntry
-                val totalLabor = calculateTotalLaborFromGroups(updatedGroups)
-
+                
                 it.copy(
-                    workerGroups = kotlinx.serialization.json.Json.encodeToString(ListSerializer(WorkerGroupEntry.serializer()), updatedGroups),
-                    totalLaborCost = totalLabor
+                    workerGroups = kotlinx.serialization.json.Json.encodeToString(ListSerializer(WorkerGroupEntry.serializer()), updatedGroups)
                 )
             }
         }
@@ -137,11 +145,8 @@ class DailyExpenseViewModel @Inject constructor(
                 val currentGroups = parseWorkerGroups(it.workerGroups)
                 if (index in currentGroups.indices) {
                     val updatedGroups = currentGroups.toMutableList().apply { removeAt(index) }
-                    val totalLabor = calculateTotalLaborFromGroups(updatedGroups)
-
                     it.copy(
-                        workerGroups = kotlinx.serialization.json.Json.encodeToString(ListSerializer(WorkerGroupEntry.serializer()), updatedGroups),
-                        totalLaborCost = totalLabor
+                        workerGroups = kotlinx.serialization.json.Json.encodeToString(ListSerializer(WorkerGroupEntry.serializer()), updatedGroups)
                     )
                 } else it
             }
@@ -152,6 +157,18 @@ class DailyExpenseViewModel @Inject constructor(
     fun addNewWorkTask(taskName: String) {
         viewModelScope.launch {
             repository.insertWorkTask(WorkTask(taskName = taskName))
+        }
+    }
+
+    fun addNewExpenseType(typeName: String) {
+        viewModelScope.launch {
+            repository.insertExpenseType(ExpenseType(typeName = typeName))
+        }
+    }
+
+    fun addNewIncomeType(typeName: String) {
+        viewModelScope.launch {
+            repository.insertIncomeType(IncomeType(typeName = typeName))
         }
     }
 
@@ -195,7 +212,14 @@ class DailyExpenseViewModel @Inject constructor(
         recalculateTotals()
     }
 
-    fun addIncome(incomeTypeId: Int, amount: BigDecimal, notes: String = "") {
+    fun addIncome(
+        incomeTypeId: Int, 
+        amount: BigDecimal, 
+        weight: Double = 0.0,
+        pricePerKilo: BigDecimal = BigDecimal.ZERO,
+        transportationCharge: BigDecimal = BigDecimal.ZERO,
+        notes: String = ""
+    ) {
         _currentExpense.update { expense ->
             expense?.let {
                 val currentIncomes = parseIncomeEntries(it.incomeEntries)
@@ -203,6 +227,9 @@ class DailyExpenseViewModel @Inject constructor(
                     incomeTypeId = incomeTypeId,
                     typeName = incomeTypes.value.find { type -> type.id == incomeTypeId }?.typeName ?: "Unknown",
                     amount = amount,
+                    weight = weight,
+                    pricePerKilo = pricePerKilo,
+                    transportationCharge = transportationCharge,
                     notes = notes
                 )
                 val updatedIncomes = currentIncomes + newEntry
@@ -241,6 +268,12 @@ class DailyExpenseViewModel @Inject constructor(
         }
     }
 
+    fun updateAdvanceAmount(amount: BigDecimal) {
+        _currentExpense.update { expense ->
+            expense?.copy(advanceAmount = amount)
+        }
+    }
+
     fun updateComments(comments: String) {
         _currentExpense.update { expense ->
             expense?.copy(comments = comments)
@@ -271,8 +304,11 @@ class DailyExpenseViewModel @Inject constructor(
         return groups.sumOf { it.wagePerDay * it.count.toBigDecimal() }
     }
 
+    private fun calculateTotalOvertimeFromGroups(groups: List<WorkerGroupEntry>): BigDecimal {
+        return groups.sumOf { (it.overtimeWagePerHour * it.overtimeHours.toBigDecimal()) * it.count.toBigDecimal() }
+    }
+
     private fun calculateLaborCost(expense: DailyExpense): BigDecimal {
-        // Combined cost from legacy fields and new worker groups
         val legacyCost = (expense.malayaliMaleWagePerDay * expense.malayaliMaleCount.toBigDecimal()) +
                 (expense.bengaliMaleWagePerDay * expense.bengaliMaleCount.toBigDecimal()) +
                 (expense.malayaliFemaleWagePerDay * expense.malayaliFemaleCount.toBigDecimal()) +
@@ -284,21 +320,20 @@ class DailyExpenseViewModel @Inject constructor(
     }
 
     private fun calculateOvertimeCost(expense: DailyExpense): BigDecimal {
-        // Assuming overtime rate is 1.5x base rate for simplicity
         val groups = parseWorkerGroups(expense.workerGroups)
-        val totalWorkersCount = (expense.malayaliMaleCount + expense.bengaliMaleCount +
-                          expense.malayaliFemaleCount + expense.bengaliFemaleCount +
-                          groups.sumOf { it.count }).toBigDecimal()
-
-        val totalBaseWage = (expense.malayaliMaleWagePerDay + expense.bengaliMaleWagePerDay +
-                           expense.malayaliFemaleWagePerDay + expense.bengaliFemaleWagePerDay +
-                           groups.sumOf { it.wagePerDay })
-
-        val averageRate = if (totalWorkersCount > BigDecimal.ZERO) {
-            totalBaseWage / (4 + groups.size).toBigDecimal()
+        val groupsOvertime = calculateTotalOvertimeFromGroups(groups)
+        
+        val legacyWorkersCount = (expense.malayaliMaleCount + expense.bengaliMaleCount +
+                                 expense.malayaliFemaleCount + expense.bengaliFemaleCount).toBigDecimal()
+        
+        val legacyAverageRate = if (legacyWorkersCount > BigDecimal.ZERO) {
+            (expense.malayaliMaleWagePerDay + expense.bengaliMaleWagePerDay +
+             expense.malayaliFemaleWagePerDay + expense.bengaliFemaleWagePerDay) / BigDecimal("4")
         } else BigDecimal.ZERO
 
-        return averageRate * BigDecimal("1.5") * expense.overtimeHours.toBigDecimal()
+        val legacyOvertime = legacyAverageRate * BigDecimal("1.5") * expense.overtimeHours.toBigDecimal()
+
+        return legacyOvertime + groupsOvertime
     }
 
     fun saveExpense() {
@@ -386,7 +421,7 @@ class DailyExpenseViewModel @Inject constructor(
 
     fun getTotalCost(): BigDecimal {
         return _currentExpense.value?.let {
-            it.totalLaborCost + it.totalOvertimeCost + it.totalOtherExpensesCost
+            it.totalLaborCost + it.totalOvertimeCost + it.totalOtherExpensesCost + it.advanceAmount
         } ?: BigDecimal.ZERO
     }
 

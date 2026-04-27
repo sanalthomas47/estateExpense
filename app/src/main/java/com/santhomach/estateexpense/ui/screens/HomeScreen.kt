@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,10 +24,11 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onNavigateToExpenseEntry: (LocalDate) -> Unit = {},
+    onNavigateToExpenseEntry: (LocalDate, Int?) -> Unit = { _, _ -> },
     onNavigateToReports: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToPayments: () -> Unit = {},
+    onNavigateToWeeklyFunds: () -> Unit = {},
     viewModel: ReportsViewModel? = null
 ) {
     if (LocalInspectionMode.current && viewModel == null) {
@@ -36,7 +38,8 @@ fun HomeScreen(
             onNavigateToExpenseEntry = onNavigateToExpenseEntry,
             onNavigateToReports = onNavigateToReports,
             onNavigateToSettings = onNavigateToSettings,
-            onNavigateToPayments = onNavigateToPayments
+            onNavigateToPayments = onNavigateToPayments,
+            onNavigateToWeeklyFunds = onNavigateToWeeklyFunds
         )
         return
     }
@@ -51,7 +54,8 @@ fun HomeScreen(
         onNavigateToExpenseEntry = onNavigateToExpenseEntry,
         onNavigateToReports = onNavigateToReports,
         onNavigateToSettings = onNavigateToSettings,
-        onNavigateToPayments = onNavigateToPayments
+        onNavigateToPayments = onNavigateToPayments,
+        onNavigateToWeeklyFunds = onNavigateToWeeklyFunds
     )
 }
 
@@ -60,10 +64,11 @@ fun HomeScreen(
 fun HomeScreenContent(
     recentExpenses: List<DailyExpense>,
     dailySummary: ExpenseSummary,
-    onNavigateToExpenseEntry: (LocalDate) -> Unit,
+    onNavigateToExpenseEntry: (LocalDate, Int?) -> Unit,
     onNavigateToReports: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToPayments: () -> Unit
+    onNavigateToPayments: () -> Unit,
+    onNavigateToWeeklyFunds: () -> Unit
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -71,6 +76,9 @@ fun HomeScreenContent(
             TopAppBar(
                 title = { Text("Estate Expense Tracker") },
                 actions = {
+                    IconButton(onClick = { /* Nothing to save here */ }) {
+                        Icon(Icons.Filled.Save, contentDescription = "Save")
+                    }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = "Settings")
                     }
@@ -79,7 +87,7 @@ fun HomeScreenContent(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { onNavigateToExpenseEntry(LocalDate.now()) }
+                onClick = { onNavigateToExpenseEntry(LocalDate.now(), null) }
             ) {
                 Icon(Icons.Filled.Add, contentDescription = "Add Expense")
             }
@@ -144,14 +152,14 @@ fun HomeScreenContent(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             OutlinedButton(
-                                onClick = { onNavigateToExpenseEntry(LocalDate.now()) },
+                                onClick = { onNavigateToExpenseEntry(LocalDate.now(), null) },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text("Add Today")
                             }
 
                             OutlinedButton(
-                                onClick = { onNavigateToExpenseEntry(LocalDate.now().plusDays(1)) },
+                                onClick = { onNavigateToExpenseEntry(LocalDate.now().plusDays(1), null) },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text("Add Tomorrow")
@@ -176,6 +184,13 @@ fun HomeScreenContent(
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text("Payments")
+                            }
+
+                            Button(
+                                onClick = onNavigateToWeeklyFunds,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Weekly")
                             }
                         }
                     }
@@ -202,7 +217,12 @@ fun HomeScreenContent(
             items(recentExpenses.take(5)) { expense ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    onClick = { /* Navigate to edit expense */ }
+                    onClick = { 
+                        onNavigateToExpenseEntry(
+                            try { LocalDate.parse(expense.date) } catch(e: Exception) { LocalDate.now() },
+                            expense.id
+                        )
+                    }
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -282,7 +302,7 @@ fun HomeScreenContent(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(8.dp))
-                            Button(onClick = { onNavigateToExpenseEntry(LocalDate.now()) }) {
+                            Button(onClick = { onNavigateToExpenseEntry(LocalDate.now(), null) }) {
                                 Text("Add Your First Expense")
                             }
                         }
