@@ -51,10 +51,50 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun updatePermanentWorker(worker: com.santhomach.estateexpense.data.model.PermanentWorker) {
+        viewModelScope.launch {
+            try {
+                repository.updatePermanentWorker(worker)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun deletePermanentWorker(worker: com.santhomach.estateexpense.data.model.PermanentWorker) {
+        viewModelScope.launch {
+            try {
+                repository.deletePermanentWorker(worker)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
     fun addWorkerType(name: String, wage: BigDecimal) {
         viewModelScope.launch {
             try {
                 repository.insertWorkerType(com.santhomach.estateexpense.data.model.WorkerType(workerTypeName = name, dailyBasicWage = wage))
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun updateWorkerType(workerType: com.santhomach.estateexpense.data.model.WorkerType) {
+        viewModelScope.launch {
+            try {
+                repository.updateWorkerType(workerType)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun deleteWorkerType(workerType: com.santhomach.estateexpense.data.model.WorkerType) {
+        viewModelScope.launch {
+            try {
+                repository.deleteWorkerType(workerType)
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
             }
@@ -71,6 +111,26 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun updateExpenseType(expenseType: com.santhomach.estateexpense.data.model.ExpenseType) {
+        viewModelScope.launch {
+            try {
+                repository.updateExpenseType(expenseType)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun deleteExpenseType(expenseType: com.santhomach.estateexpense.data.model.ExpenseType) {
+        viewModelScope.launch {
+            try {
+                repository.deleteExpenseType(expenseType)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
     fun addIncomeType(name: String) {
         viewModelScope.launch {
             try {
@@ -81,10 +141,50 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun updateIncomeType(incomeType: com.santhomach.estateexpense.data.model.IncomeType) {
+        viewModelScope.launch {
+            try {
+                repository.updateIncomeType(incomeType)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun deleteIncomeType(incomeType: com.santhomach.estateexpense.data.model.IncomeType) {
+        viewModelScope.launch {
+            try {
+                repository.deleteIncomeType(incomeType)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
     fun addWorkTask(name: String) {
         viewModelScope.launch {
             try {
                 repository.insertWorkTask(com.santhomach.estateexpense.data.model.WorkTask(taskName = name))
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun updateWorkTask(task: com.santhomach.estateexpense.data.model.WorkTask) {
+        viewModelScope.launch {
+            try {
+                repository.updateWorkTask(task)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun deleteWorkTask(task: com.santhomach.estateexpense.data.model.WorkTask) {
+        viewModelScope.launch {
+            try {
+                repository.deleteWorkTask(task)
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
             }

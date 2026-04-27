@@ -161,6 +161,9 @@ data class DailyExpense(
     // Advance amount paid on this day
     @Serializable(with = BigDecimalSerializer::class)
     val advanceAmount: BigDecimal = BigDecimal.ZERO,
+    
+    // Comment/reason for advance payment
+    val advanceReason: String = "",
 
     // Worker groups with tasks and comments (stored as JSON)
     val workerGroups: String = "[]", // JSON array of WorkerGroupEntry
@@ -212,6 +215,7 @@ data class OtherExpenseEntry(
     val typeName: String,
     @Serializable(with = BigDecimalSerializer::class)
     val amount: BigDecimal,
+    val quantity: Double = 1.0,
     val notes: String = "",
     val addedAt: String = LocalDateTime.now().toString()
 )

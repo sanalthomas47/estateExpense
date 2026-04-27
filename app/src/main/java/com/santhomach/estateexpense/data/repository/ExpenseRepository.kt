@@ -70,6 +70,14 @@ class ExpenseRepository @Inject constructor(
         return expenseTypeDao.insert(expenseType)
     }
 
+    suspend fun updateExpenseType(expenseType: ExpenseType) {
+        expenseTypeDao.update(expenseType)
+    }
+
+    suspend fun deleteExpenseType(expenseType: ExpenseType) {
+        expenseTypeDao.delete(expenseType)
+    }
+
     suspend fun getAllActiveExpenseTypes(): List<ExpenseType> {
         return expenseTypeDao.getAllActive()
     }
@@ -81,6 +89,14 @@ class ExpenseRepository @Inject constructor(
     // Income Type Operations
     suspend fun insertIncomeType(incomeType: IncomeType): Long {
         return incomeTypeDao.insert(incomeType)
+    }
+
+    suspend fun updateIncomeType(incomeType: IncomeType) {
+        incomeTypeDao.update(incomeType)
+    }
+
+    suspend fun deleteIncomeType(incomeType: IncomeType) {
+        incomeTypeDao.delete(incomeType)
     }
 
     suspend fun getAllActiveIncomeTypes(): List<IncomeType> {
@@ -96,6 +112,14 @@ class ExpenseRepository @Inject constructor(
         return workerTypeDao.insert(workerType)
     }
 
+    suspend fun updateWorkerType(workerType: WorkerType) {
+        workerTypeDao.update(workerType)
+    }
+
+    suspend fun deleteWorkerType(workerType: WorkerType) {
+        workerTypeDao.delete(workerType)
+    }
+
     suspend fun getAllActiveWorkerTypes(): List<WorkerType> {
         return workerTypeDao.getAllActive()
     }
@@ -107,6 +131,14 @@ class ExpenseRepository @Inject constructor(
     // Permanent Worker Operations
     suspend fun insertPermanentWorker(worker: PermanentWorker): Long {
         return permanentWorkerDao.insert(worker)
+    }
+
+    suspend fun updatePermanentWorker(worker: PermanentWorker) {
+        permanentWorkerDao.update(worker)
+    }
+
+    suspend fun deletePermanentWorker(worker: PermanentWorker) {
+        permanentWorkerDao.delete(worker)
     }
 
     suspend fun getAllActivePermanentWorkers(): List<PermanentWorker> {
@@ -167,6 +199,14 @@ class ExpenseRepository @Inject constructor(
     // Work Task Operations
     suspend fun insertWorkTask(task: WorkTask): Long {
         return taskDao.insert(task)
+    }
+
+    suspend fun updateWorkTask(task: WorkTask) {
+        taskDao.update(task)
+    }
+
+    suspend fun deleteWorkTask(task: WorkTask) {
+        taskDao.delete(task)
     }
 
     suspend fun getAllActiveWorkTasks(): List<WorkTask> {

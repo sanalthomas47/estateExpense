@@ -152,9 +152,15 @@ fun ReportsScreen(
                         SummaryRow("Total Overtime Cost", "₹${dailySummary.totalOvertimeCost}")
                         SummaryRow("Total Advance Paid", "₹${dailySummary.totalAdvanceAmount}")
                         SummaryRow("Total Other Expenses", "₹${dailySummary.totalOtherExpenses}")
-                        SummaryRow("Total Excess Balance", "₹${dailySummary.totalExcessBalance}")
+                        SummaryRow("Previous Excess Balance", "₹${dailySummary.totalExcessBalance}")
+                        
+                        val totalExp = dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses + dailySummary.totalAdvanceAmount + dailySummary.totalExcessBalance
+                        
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
-                        SummaryRow("Net Amount", "₹${dailySummary.netAmount}", isTotal = true)
+                        SummaryRow("TOTAL EXPENSES", "₹$totalExp", isTotal = true)
+                        SummaryRow("TOTAL INCOME", "₹${dailySummary.totalIncome}", isTotal = true)
+                        
+                        Divider(modifier = Modifier.padding(vertical = 4.dp))
                         SummaryRow("Total Days", dailySummary.totalDays.toString())
                         SummaryRow("Avg Daily Income", "₹${dailySummary.averageDailyIncome}")
                         SummaryRow("Avg Daily Expense", "₹${dailySummary.averageDailyExpense}")
@@ -177,9 +183,15 @@ fun ReportsScreen(
                         SummaryRow("Total Overtime Cost", "₹${weeklySummary.totalOvertimeCost}")
                         SummaryRow("Total Advance Paid", "₹${weeklySummary.totalAdvanceAmount}")
                         SummaryRow("Total Other Expenses", "₹${weeklySummary.totalOtherExpenses}")
-                        SummaryRow("Total Excess Balance", "₹${weeklySummary.totalExcessBalance}")
+                        SummaryRow("Previous Excess Balance", "₹${weeklySummary.totalExcessBalance}")
+                        
+                        val totalExp = weeklySummary.totalLaborCost + weeklySummary.totalOvertimeCost + weeklySummary.totalOtherExpenses + weeklySummary.totalAdvanceAmount + weeklySummary.totalExcessBalance
+                        
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
-                        SummaryRow("Net Amount", "₹${weeklySummary.netAmount}", isTotal = true)
+                        SummaryRow("TOTAL EXPENSES", "₹$totalExp", isTotal = true)
+                        SummaryRow("TOTAL INCOME", "₹${weeklySummary.totalIncome}", isTotal = true)
+                        
+                        Divider(modifier = Modifier.padding(vertical = 4.dp))
                         SummaryRow("Total Weeks", weeklySummary.totalWeeks.toString())
                         SummaryRow("Avg Weekly Income", "₹${weeklySummary.averageWeeklyIncome}")
                         SummaryRow("Avg Weekly Expense", "₹${weeklySummary.averageWeeklyExpense}")
@@ -311,31 +323,22 @@ fun ReportsScreen(
                                 },
                                 style = MaterialTheme.typography.titleSmall
                             )
-                            Text(
-                                text = "₹${expense.calculateNetAmount()}",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = if (expense.calculateNetAmount() >= BigDecimal.ZERO)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.error
-                            )
+                            Row {
+                                Text(
+                                    text = "Exp: ₹${expense.totalLaborCost + expense.totalOvertimeCost + expense.totalOtherExpensesCost + expense.advanceAmount + expense.excessBalance}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Inc: ₹${expense.totalIncome}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(4.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Income: ₹${expense.totalIncome}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Text(
-                                text = "Expenses: ₹${expense.totalLaborCost + expense.totalOvertimeCost + expense.totalOtherExpensesCost}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
 
                         if (expense.comments.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(4.dp))

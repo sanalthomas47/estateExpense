@@ -38,7 +38,7 @@ import androidx.room.TypeConverters
         WorkerPayment::class,
         com.santhomach.estateexpense.data.model.WeeklyFunds::class
     ],
-    version = 3,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(RoomConverters::class)

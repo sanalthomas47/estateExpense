@@ -154,6 +154,40 @@ class DailyExpenseViewModel @Inject constructor(
         recalculateTotals()
     }
 
+    fun updateWorkerGroup(
+        index: Int,
+        workerTypeId: Int,
+        count: Int,
+        wage: BigDecimal,
+        overtimeHours: Int,
+        overtimeWagePerHour: BigDecimal,
+        task: String,
+        comments: String = ""
+    ) {
+        _currentExpense.update { expense ->
+            expense?.let {
+                val currentGroups = parseWorkerGroups(it.workerGroups).toMutableList()
+                if (index in currentGroups.indices) {
+                    val newEntry = WorkerGroupEntry(
+                        workerTypeId = workerTypeId,
+                        workerTypeName = workerTypes.value.find { type -> type.id == workerTypeId }?.workerTypeName ?: "Unknown",
+                        count = count,
+                        wagePerDay = wage,
+                        overtimeHours = overtimeHours,
+                        overtimeWagePerHour = overtimeWagePerHour,
+                        taskPerformed = task,
+                        comments = comments
+                    )
+                    currentGroups[index] = newEntry
+                    it.copy(
+                        workerGroups = kotlinx.serialization.json.Json.encodeToString(ListSerializer(WorkerGroupEntry.serializer()), currentGroups)
+                    )
+                } else it
+            }
+        }
+        recalculateTotals()
+    }
+
     fun addNewWorkTask(taskName: String) {
         viewModelScope.launch {
             repository.insertWorkTask(WorkTask(taskName = taskName))
@@ -172,7 +206,7 @@ class DailyExpenseViewModel @Inject constructor(
         }
     }
 
-    fun addOtherExpense(expenseTypeId: Int, amount: BigDecimal, notes: String = "") {
+    fun addOtherExpense(expenseTypeId: Int, amount: BigDecimal, quantity: Double = 1.0, notes: String = "") {
         _currentExpense.update { expense ->
             expense?.let {
                 val currentExpenses = parseOtherExpenses(it.otherExpenses)
@@ -180,6 +214,7 @@ class DailyExpenseViewModel @Inject constructor(
                     expenseTypeId = expenseTypeId,
                     typeName = expenseTypes.value.find { type -> type.id == expenseTypeId }?.typeName ?: "Unknown",
                     amount = amount,
+                    quantity = quantity,
                     notes = notes
                 )
                 val updatedExpenses = currentExpenses + newEntry
@@ -204,6 +239,31 @@ class DailyExpenseViewModel @Inject constructor(
 
                     it.copy(
                         otherExpenses = kotlinx.serialization.json.Json.encodeToString(ListSerializer(OtherExpenseEntry.serializer()), updatedExpenses),
+                        totalOtherExpensesCost = totalAmount
+                    )
+                } else it
+            }
+        }
+        recalculateTotals()
+    }
+
+    fun updateOtherExpense(index: Int, expenseTypeId: Int, amount: BigDecimal, quantity: Double = 1.0, notes: String = "") {
+        _currentExpense.update { expense ->
+            expense?.let {
+                val currentExpenses = parseOtherExpenses(it.otherExpenses).toMutableList()
+                if (index in currentExpenses.indices) {
+                    val newEntry = OtherExpenseEntry(
+                        expenseTypeId = expenseTypeId,
+                        typeName = expenseTypes.value.find { type -> type.id == expenseTypeId }?.typeName ?: "Unknown",
+                        amount = amount,
+                        quantity = quantity,
+                        notes = notes
+                    )
+                    currentExpenses[index] = newEntry
+                    val totalAmount = currentExpenses.sumOf { entry -> entry.amount }
+
+                    it.copy(
+                        otherExpenses = kotlinx.serialization.json.Json.encodeToString(ListSerializer(OtherExpenseEntry.serializer()), currentExpenses),
                         totalOtherExpensesCost = totalAmount
                     )
                 } else it
@@ -262,6 +322,41 @@ class DailyExpenseViewModel @Inject constructor(
         recalculateTotals()
     }
 
+    fun updateIncome(
+        index: Int,
+        incomeTypeId: Int,
+        amount: BigDecimal,
+        weight: Double = 0.0,
+        pricePerKilo: BigDecimal = BigDecimal.ZERO,
+        transportationCharge: BigDecimal = BigDecimal.ZERO,
+        notes: String = ""
+    ) {
+        _currentExpense.update { expense ->
+            expense?.let {
+                val currentIncomes = parseIncomeEntries(it.incomeEntries).toMutableList()
+                if (index in currentIncomes.indices) {
+                    val newEntry = IncomeEntry(
+                        incomeTypeId = incomeTypeId,
+                        typeName = incomeTypes.value.find { type -> type.id == incomeTypeId }?.typeName ?: "Unknown",
+                        amount = amount,
+                        weight = weight,
+                        pricePerKilo = pricePerKilo,
+                        transportationCharge = transportationCharge,
+                        notes = notes
+                    )
+                    currentIncomes[index] = newEntry
+                    val totalAmount = currentIncomes.sumOf { entry -> entry.amount }
+
+                    it.copy(
+                        incomeEntries = kotlinx.serialization.json.Json.encodeToString(ListSerializer(IncomeEntry.serializer()), currentIncomes),
+                        totalIncome = totalAmount
+                    )
+                } else it
+            }
+        }
+        recalculateTotals()
+    }
+
     fun updateExcessBalance(amount: BigDecimal) {
         _currentExpense.update { expense ->
             expense?.copy(excessBalance = amount)
@@ -271,6 +366,12 @@ class DailyExpenseViewModel @Inject constructor(
     fun updateAdvanceAmount(amount: BigDecimal) {
         _currentExpense.update { expense ->
             expense?.copy(advanceAmount = amount)
+        }
+    }
+
+    fun updateAdvanceReason(reason: String) {
+        _currentExpense.update { expense ->
+            expense?.copy(advanceReason = reason)
         }
     }
 
@@ -421,7 +522,8 @@ class DailyExpenseViewModel @Inject constructor(
 
     fun getTotalCost(): BigDecimal {
         return _currentExpense.value?.let {
-            it.totalLaborCost + it.totalOvertimeCost + it.totalOtherExpensesCost + it.advanceAmount
+            // Excess balance is a carry-over fund (unused money), so it reduces the net cash requirement for expenses today
+            (it.totalLaborCost + it.totalOvertimeCost + it.totalOtherExpensesCost + it.advanceAmount) - it.excessBalance
         } ?: BigDecimal.ZERO
     }
 

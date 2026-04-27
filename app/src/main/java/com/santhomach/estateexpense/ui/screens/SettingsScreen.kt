@@ -49,6 +49,13 @@ fun SettingsScreen(
     var showAddIncomeTypeDialog by remember { mutableStateOf(false) }
     var showAddWorkTaskDialog by remember { mutableStateOf(false) }
 
+    // State for editing items
+    var editingWorker by remember { mutableStateOf<com.santhomach.estateexpense.data.model.PermanentWorker?>(null) }
+    var editingWorkerType by remember { mutableStateOf<com.santhomach.estateexpense.data.model.WorkerType?>(null) }
+    var editingExpenseType by remember { mutableStateOf<com.santhomach.estateexpense.data.model.ExpenseType?>(null) }
+    var editingIncomeType by remember { mutableStateOf<com.santhomach.estateexpense.data.model.IncomeType?>(null) }
+    var editingWorkTask by remember { mutableStateOf<com.santhomach.estateexpense.data.model.WorkTask?>(null) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -78,7 +85,9 @@ fun SettingsScreen(
                 SettingsCategoryCard(
                     title = "Manage Managers / Staff",
                     items = workers.map { "${it.name} (${it.role})" },
-                    onAddClick = { showAddWorkerDialog = true }
+                    onAddClick = { showAddWorkerDialog = true },
+                    onEditClick = { index -> editingWorker = workers[index] },
+                    onDeleteClick = { index -> viewModel.deletePermanentWorker(workers[index]) }
                 )
             }
 
@@ -87,7 +96,9 @@ fun SettingsScreen(
                 SettingsCategoryCard(
                     title = "Worker Types & Wages",
                     items = workerTypes.map { "${it.workerTypeName}: ₹${it.dailyBasicWage}" },
-                    onAddClick = { showAddWorkerTypeDialog = true }
+                    onAddClick = { showAddWorkerTypeDialog = true },
+                    onEditClick = { index -> editingWorkerType = workerTypes[index] },
+                    onDeleteClick = { index -> viewModel.deleteWorkerType(workerTypes[index]) }
                 )
             }
 
@@ -96,7 +107,9 @@ fun SettingsScreen(
                 SettingsCategoryCard(
                     title = "Work Tasks",
                     items = workTasks.map { it.taskName },
-                    onAddClick = { showAddWorkTaskDialog = true }
+                    onAddClick = { showAddWorkTaskDialog = true },
+                    onEditClick = { index -> editingWorkTask = workTasks[index] },
+                    onDeleteClick = { index -> viewModel.deleteWorkTask(workTasks[index]) }
                 )
             }
 
@@ -105,7 +118,9 @@ fun SettingsScreen(
                 SettingsCategoryCard(
                     title = "Expense Categories",
                     items = expenseTypes.map { it.typeName },
-                    onAddClick = { showAddExpenseTypeDialog = true }
+                    onAddClick = { showAddExpenseTypeDialog = true },
+                    onEditClick = { index -> editingExpenseType = expenseTypes[index] },
+                    onDeleteClick = { index -> viewModel.deleteExpenseType(expenseTypes[index]) }
                 )
             }
 
@@ -114,7 +129,9 @@ fun SettingsScreen(
                 SettingsCategoryCard(
                     title = "Income Categories",
                     items = incomeTypes.map { it.typeName },
-                    onAddClick = { showAddIncomeTypeDialog = true }
+                    onAddClick = { showAddIncomeTypeDialog = true },
+                    onEditClick = { index -> editingIncomeType = incomeTypes[index] },
+                    onDeleteClick = { index -> viewModel.deleteIncomeType(incomeTypes[index]) }
                 )
             }
 
@@ -206,61 +223,107 @@ fun SettingsScreen(
         }
     }
 
-    if (showAddWorkerDialog) {
+    if (showAddWorkerDialog || editingWorker != null) {
         AddWorkerDialog(
-            onDismiss = { showAddWorkerDialog = false },
-            onConfirm = { name, role, wage ->
-                viewModel.addPermanentWorker(name, role, wage)
+            initialWorker = editingWorker,
+            onDismiss = { 
                 showAddWorkerDialog = false
+                editingWorker = null
+            },
+            onConfirm = { name, role, wage ->
+                if (editingWorker != null) {
+                    viewModel.updatePermanentWorker(editingWorker!!.copy(name = name, role = role, dailyBasicWage = wage))
+                } else {
+                    viewModel.addPermanentWorker(name, role, wage)
+                }
+                showAddWorkerDialog = false
+                editingWorker = null
             }
         )
     }
 
-    if (showAddWorkerTypeDialog) {
+    if (showAddWorkerTypeDialog || editingWorkerType != null) {
         AddSimpleItemDialog(
-            title = "Add Worker Type",
+            title = if (editingWorkerType == null) "Add Worker Type" else "Edit Worker Type",
             label = "Worker Type Name",
             hasWage = true,
-            onDismiss = { showAddWorkerTypeDialog = false },
-            onConfirm = { name, wage ->
-                viewModel.addWorkerType(name, wage)
+            initialName = editingWorkerType?.workerTypeName ?: "",
+            initialWage = editingWorkerType?.dailyBasicWage?.toString() ?: "0",
+            onDismiss = { 
                 showAddWorkerTypeDialog = false
+                editingWorkerType = null
+            },
+            onConfirm = { name, wage ->
+                if (editingWorkerType != null) {
+                    viewModel.updateWorkerType(editingWorkerType!!.copy(workerTypeName = name, dailyBasicWage = wage))
+                } else {
+                    viewModel.addWorkerType(name, wage)
+                }
+                showAddWorkerTypeDialog = false
+                editingWorkerType = null
             }
         )
     }
 
-    if (showAddExpenseTypeDialog) {
+    if (showAddExpenseTypeDialog || editingExpenseType != null) {
         AddSimpleItemDialog(
-            title = "Add Expense Category",
+            title = if (editingExpenseType == null) "Add Expense Category" else "Edit Expense Category",
             label = "Category Name",
-            onDismiss = { showAddExpenseTypeDialog = false },
-            onConfirm = { name, _ ->
-                viewModel.addExpenseType(name)
+            initialName = editingExpenseType?.typeName ?: "",
+            onDismiss = { 
                 showAddExpenseTypeDialog = false
+                editingExpenseType = null
+            },
+            onConfirm = { name, _ ->
+                if (editingExpenseType != null) {
+                    viewModel.updateExpenseType(editingExpenseType!!.copy(typeName = name))
+                } else {
+                    viewModel.addExpenseType(name)
+                }
+                showAddExpenseTypeDialog = false
+                editingExpenseType = null
             }
         )
     }
 
-    if (showAddIncomeTypeDialog) {
+    if (showAddIncomeTypeDialog || editingIncomeType != null) {
         AddSimpleItemDialog(
-            title = "Add Income Category",
+            title = if (editingIncomeType == null) "Add Income Category" else "Edit Income Category",
             label = "Category Name",
-            onDismiss = { showAddIncomeTypeDialog = false },
-            onConfirm = { name, _ ->
-                viewModel.addIncomeType(name)
+            initialName = editingIncomeType?.typeName ?: "",
+            onDismiss = { 
                 showAddIncomeTypeDialog = false
+                editingIncomeType = null
+            },
+            onConfirm = { name, _ ->
+                if (editingIncomeType != null) {
+                    viewModel.updateIncomeType(editingIncomeType!!.copy(typeName = name))
+                } else {
+                    viewModel.addIncomeType(name)
+                }
+                showAddIncomeTypeDialog = false
+                editingIncomeType = null
             }
         )
     }
 
-    if (showAddWorkTaskDialog) {
+    if (showAddWorkTaskDialog || editingWorkTask != null) {
         AddSimpleItemDialog(
-            title = "Add Work Task",
+            title = if (editingWorkTask == null) "Add Work Task" else "Edit Work Task",
             label = "Task Name",
-            onDismiss = { showAddWorkTaskDialog = false },
-            onConfirm = { name, _ ->
-                viewModel.addWorkTask(name)
+            initialName = editingWorkTask?.taskName ?: "",
+            onDismiss = { 
                 showAddWorkTaskDialog = false
+                editingWorkTask = null
+            },
+            onConfirm = { name, _ ->
+                if (editingWorkTask != null) {
+                    viewModel.updateWorkTask(editingWorkTask!!.copy(taskName = name))
+                } else {
+                    viewModel.addWorkTask(name)
+                }
+                showAddWorkTaskDialog = false
+                editingWorkTask = null
             }
         )
     }
@@ -270,7 +333,9 @@ fun SettingsScreen(
 fun SettingsCategoryCard(
     title: String,
     items: List<String>,
-    onAddClick: () -> Unit
+    onAddClick: () -> Unit,
+    onEditClick: (Int) -> Unit = {},
+    onDeleteClick: (Int) -> Unit = {}
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -297,12 +362,31 @@ fun SettingsCategoryCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
-                items.forEach { item ->
-                    Text(
-                        text = item,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
+                items.forEachIndexed { index, item ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = item,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Row {
+                            TextButton(onClick = { onEditClick(index) }) {
+                                Text("Edit", fontSize = MaterialTheme.typography.labelSmall.fontSize)
+                            }
+                            TextButton(
+                                onClick = { onDeleteClick(index) },
+                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                            ) {
+                                Text("Delete", fontSize = MaterialTheme.typography.labelSmall.fontSize)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -312,16 +396,17 @@ fun SettingsCategoryCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddWorkerDialog(
+    initialWorker: com.santhomach.estateexpense.data.model.PermanentWorker? = null,
     onDismiss: () -> Unit,
     onConfirm: (String, String, BigDecimal) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var role by remember { mutableStateOf("Manager") }
-    var wage by remember { mutableStateOf("0") }
+    var name by remember { mutableStateOf(initialWorker?.name ?: "") }
+    var role by remember { mutableStateOf(initialWorker?.role ?: "Manager") }
+    var wage by remember { mutableStateOf(initialWorker?.dailyBasicWage?.toString() ?: "0") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Manager / Permanent Worker") },
+        title = { Text(if (initialWorker == null) "Add Manager / Permanent Worker" else "Edit Manager / Permanent Worker") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -376,7 +461,7 @@ fun AddWorkerDialog(
                 onClick = { onConfirm(name, role, wage.toBigDecimalOrNull() ?: BigDecimal.ZERO) },
                 enabled = name.isNotEmpty()
             ) {
-                Text("Add")
+                Text(if (initialWorker == null) "Add" else "Update")
             }
         },
         dismissButton = {
@@ -393,11 +478,13 @@ fun AddSimpleItemDialog(
     title: String,
     label: String,
     hasWage: Boolean = false,
+    initialName: String = "",
+    initialWage: String = "0",
     onDismiss: () -> Unit,
     onConfirm: (String, BigDecimal) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var wage by remember { mutableStateOf("0") }
+    var name by remember { mutableStateOf(initialName) }
+    var wage by remember { mutableStateOf(initialWage) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -427,7 +514,7 @@ fun AddSimpleItemDialog(
                 onClick = { onConfirm(name, wage.toBigDecimalOrNull() ?: BigDecimal.ZERO) },
                 enabled = name.isNotEmpty()
             ) {
-                Text("Add")
+                Text("Save")
             }
         },
         dismissButton = {

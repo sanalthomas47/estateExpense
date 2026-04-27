@@ -48,6 +48,35 @@ fun HomeScreen(
     val recentExpenses by actualViewModel.recentExpenses.collectAsState()
     val dailySummary by actualViewModel.dailySummary.collectAsState()
 
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val selectedDate = java.time.Instant.ofEpochMilli(millis)
+                            .atZone(java.time.ZoneId.systemDefault())
+                            .toLocalDate()
+                        onNavigateToExpenseEntry(selectedDate, null)
+                    }
+                    showDatePicker = false
+                }) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
     HomeScreenContent(
         recentExpenses = recentExpenses,
         dailySummary = dailySummary,
@@ -55,7 +84,8 @@ fun HomeScreen(
         onNavigateToReports = onNavigateToReports,
         onNavigateToSettings = onNavigateToSettings,
         onNavigateToPayments = onNavigateToPayments,
-        onNavigateToWeeklyFunds = onNavigateToWeeklyFunds
+        onNavigateToWeeklyFunds = onNavigateToWeeklyFunds,
+        onShowDatePicker = { showDatePicker = true }
     )
 }
 
@@ -68,7 +98,8 @@ fun HomeScreenContent(
     onNavigateToReports: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToPayments: () -> Unit,
-    onNavigateToWeeklyFunds: () -> Unit
+    onNavigateToWeeklyFunds: () -> Unit,
+    onShowDatePicker: () -> Unit = {}
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -121,16 +152,8 @@ fun HomeScreenContent(
                             )
                             StatItem(
                                 label = "Expenses",
-                                value = "₹${dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses}",
+                                value = "₹${dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses + dailySummary.totalAdvanceAmount + dailySummary.totalExcessBalance}",
                                 color = MaterialTheme.colorScheme.error
-                            )
-                            StatItem(
-                                label = "Net",
-                                value = "₹${dailySummary.netAmount}",
-                                color = if (dailySummary.netAmount >= BigDecimal.ZERO)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.error
                             )
                         }
                     }
@@ -163,6 +186,13 @@ fun HomeScreenContent(
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text("Add Tomorrow")
+                            }
+
+                            OutlinedButton(
+                                onClick = onShowDatePicker,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Add for Date")
                             }
                         }
 
@@ -238,31 +268,22 @@ fun HomeScreenContent(
                                 },
                                 style = MaterialTheme.typography.titleSmall
                             )
-                            Text(
-                                text = "₹${expense.calculateNetAmount()}",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = if (expense.calculateNetAmount() >= BigDecimal.ZERO)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.error
-                            )
+                            Row {
+                                Text(
+                                    text = "Exp: ₹${expense.totalLaborCost + expense.totalOvertimeCost + expense.totalOtherExpensesCost + expense.advanceAmount + expense.excessBalance}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Inc: ₹${expense.totalIncome}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(4.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Income: ₹${expense.totalIncome}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Text(
-                                text = "Expenses: ₹${expense.totalLaborCost + expense.totalOvertimeCost + expense.totalOtherExpensesCost}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
 
                         // Worker summary
                         val totalWorkers = expense.malayaliMaleCount + expense.bengaliMaleCount +
