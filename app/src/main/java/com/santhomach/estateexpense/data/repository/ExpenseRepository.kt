@@ -15,6 +15,8 @@ class ExpenseRepository @Inject constructor(
 ) {
     private val expenseDao = database.dailyExpenseDao()
     private val expenseTypeDao = database.expenseTypeDao()
+
+    private val expenseSubtypeDao = database.expenseSubtypeDao()
     private val incomeTypeDao = database.incomeTypeDao()
     private val workerTypeDao = database.workerTypeDao()
     private val permanentWorkerDao = database.permanentWorkerDao()
@@ -61,6 +63,10 @@ class ExpenseRepository @Inject constructor(
         return expenseDao.getRecent(limit)
     }
 
+    suspend fun getDailyExpensesBeforeDate(date: String): List<DailyExpense> {
+        return expenseDao.getBeforeDate(date)
+    }
+
     fun getRecentExpensesFlow(limit: Int = 50): Flow<List<DailyExpense>> {
         return expenseDao.getRecentFlow(limit)
     }
@@ -84,6 +90,27 @@ class ExpenseRepository @Inject constructor(
 
     fun getAllActiveExpenseTypesFlow(): Flow<List<ExpenseType>> {
         return expenseTypeDao.getAllActiveFlow()
+    }
+
+    //Expense Subtype Operations
+    suspend fun insertExpenseSubtype(expenseSubtype: ExpenseSubtype): Long {
+        return expenseSubtypeDao.insert(expenseSubtype)
+    }
+
+    suspend fun updateExpenseSubtype(expenseSubtype: ExpenseSubtype) {
+        expenseSubtypeDao.update(expenseSubtype)
+    }
+
+    suspend fun deleteExpenseSubtype(expenseSubtype: ExpenseSubtype) {
+        expenseSubtypeDao.delete(expenseSubtype)
+    }
+
+    suspend fun getAllActiveExpenseSubtypes(): List<ExpenseSubtype> {
+        return expenseSubtypeDao.getAllActive()
+    }
+
+    fun getAllActiveExpenseSubtypesFlow(): Flow<List<ExpenseSubtype>> {
+        return expenseSubtypeDao.getAllActiveFlow()
     }
 
     // Income Type Operations
@@ -147,6 +174,23 @@ class ExpenseRepository @Inject constructor(
 
     fun getAllActivePermanentWorkersFlow(): Flow<List<PermanentWorker>> {
         return permanentWorkerDao.getAllActiveFlow()
+    }
+
+    // Worker Payment Operations
+    suspend fun insertWorkerPayment(payment: WorkerPayment): Long {
+        return paymentDao.insert(payment)
+    }
+
+    suspend fun updateWorkerPayment(payment: WorkerPayment) {
+        paymentDao.update(payment)
+    }
+
+    suspend fun deleteWorkerPayment(payment: WorkerPayment) {
+        paymentDao.delete(payment)
+    }
+
+    fun getAllPaymentsFlow(): Flow<List<WorkerPayment>> {
+        return paymentDao.getAllPaymentsFlow()
     }
 
     // Weekly Settlement Operations
@@ -217,31 +261,6 @@ class ExpenseRepository @Inject constructor(
         return taskDao.getAllActiveFlow()
     }
 
-    // Worker Payment Operations
-    suspend fun insertWorkerPayment(payment: WorkerPayment): Long {
-        return paymentDao.insert(payment)
-    }
-
-    suspend fun updateWorkerPayment(payment: WorkerPayment) {
-        paymentDao.update(payment)
-    }
-
-    suspend fun deleteWorkerPayment(payment: WorkerPayment) {
-        paymentDao.delete(payment)
-    }
-
-    fun getPaymentsByWorkerFlow(workerId: Int): Flow<List<WorkerPayment>> {
-        return paymentDao.getPaymentsByWorkerFlow(workerId)
-    }
-
-    fun getAllPaymentsFlow(): Flow<List<WorkerPayment>> {
-        return paymentDao.getAllPaymentsFlow()
-    }
-
-    fun getPaymentsByDateRangeFlow(startDate: String, endDate: String): Flow<List<WorkerPayment>> {
-        return paymentDao.getPaymentsByDateRangeFlow(startDate, endDate)
-    }
-
     // Weekly Funds Operations
     suspend fun insertWeeklyFunds(funds: WeeklyFunds): Long {
         return fundsDao.insert(funds)
@@ -269,10 +288,11 @@ class ExpenseRepository @Inject constructor(
                 totalOtherExpenses = expenses.sumOf { it.totalOtherExpensesCost },
                 totalAdvanceAmount = expenses.sumOf { it.advanceAmount },
                 totalExcessBalance = expenses.sumOf { it.excessBalance },
+                totalWeeklyPayment = expenses.sumOf { it.weeklyPaymentDone },
                 netAmount = expenses.sumOf { it.calculateNetAmount() },
                 totalDays = expenses.size,
                 averageDailyIncome = if (expenses.isNotEmpty()) expenses.sumOf { it.totalIncome } / expenses.size.toBigDecimal() else BigDecimal.ZERO,
-                averageDailyExpense = if (expenses.isNotEmpty()) expenses.sumOf { it.totalLaborCost + it.totalOvertimeCost + it.totalOtherExpensesCost } / expenses.size.toBigDecimal() else BigDecimal.ZERO
+                averageDailyExpense = if (expenses.isNotEmpty()) expenses.sumOf { (it.totalLaborCost + it.totalOvertimeCost + it.totalOtherExpensesCost + it.advanceAmount + it.weeklyPaymentDone - it.excessBalance).coerceAtLeast(BigDecimal.ZERO) } / expenses.size.toBigDecimal() else BigDecimal.ZERO
             )
         }
     }
@@ -284,11 +304,13 @@ class ExpenseRepository @Inject constructor(
                 totalLaborCost = dailySummary.totalLaborCost,
                 totalOvertimeCost = dailySummary.totalOvertimeCost,
                 totalOtherExpenses = dailySummary.totalOtherExpenses,
+                totalAdvanceAmount = dailySummary.totalAdvanceAmount,
+                totalWeeklyPayment = dailySummary.totalWeeklyPayment,
                 totalExcessBalance = dailySummary.totalExcessBalance,
                 netAmount = dailySummary.netAmount,
                 totalWeeks = (dailySummary.totalDays / 7).coerceAtLeast(1),
                 averageWeeklyIncome = dailySummary.totalIncome / (dailySummary.totalDays / 7).coerceAtLeast(1).toBigDecimal(),
-                averageWeeklyExpense = (dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses) / (dailySummary.totalDays / 7).coerceAtLeast(1).toBigDecimal()
+                averageWeeklyExpense = (dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses + dailySummary.totalAdvanceAmount + dailySummary.totalWeeklyPayment - dailySummary.totalExcessBalance).coerceAtLeast(BigDecimal.ZERO) / (dailySummary.totalDays / 7).coerceAtLeast(1).toBigDecimal()
             )
         }
     }
@@ -298,18 +320,38 @@ class ExpenseRepository @Inject constructor(
         // Initialize default expense types
         val defaultExpenseTypes = listOf(
             ExpenseType(typeName = "Pesticides", description = "Pesticide purchases"),
+            ExpenseType(typeName = "Fuel", description = "Fuel purchases"),
             ExpenseType(typeName = "Fertilizers", description = "Fertilizer purchases"),
-            ExpenseType(typeName = "Seeds", description = "Seed purchases"),
+            ExpenseType(typeName = "Capital Expenses", description = "Capital Expenses"),
+            ExpenseType(typeName = "Cardamom Drying", description = "Drying Cost"),
             ExpenseType(typeName = "Equipment", description = "Equipment maintenance and purchases"),
             ExpenseType(typeName = "Transportation", description = "Transport costs"),
             ExpenseType(typeName = "Utilities", description = "Electricity, water, etc."),
             ExpenseType(typeName = "Maintenance", description = "General maintenance"),
+            ExpenseType(typeName = "PropertyTax", description = "Property Tax"),
             ExpenseType(typeName = "Other", description = "Miscellaneous expenses")
+        )
+
+        val defaultExpenseSubtypes = listOf(
+            ExpenseSubtype(typeName = "Diesel", parentTypeName = ExpenseType(typeName = "Fuel", description = "Fuel purchases") ,description = "Pesticide purchases"),
+            ExpenseSubtype(typeName = "Petrol",parentTypeName = ExpenseType(typeName = "Fuel", description = "Fuel purchases"), description = "Fertilizer purchases"),
+            /*ExpenseSubtype(typeName = "Seeds", description = "Seed purchases"),
+            ExpenseSubtype(typeName = "Equipment", description = "Equipment maintenance and purchases"),
+            ExpenseSubtype(typeName = "Transportation", description = "Transport costs"),
+            ExpenseSubtype(typeName = "Utilities", description = "Electricity, water, etc."),
+            ExpenseSubtype(typeName = "Maintenance", description = "General maintenance"),
+            ExpenseSubtype(typeName = "Other", description = "Miscellaneous expenses")*/
         )
 
         for (type in defaultExpenseTypes) {
             if (expenseTypeDao.getAllActive().none { it.typeName == type.typeName }) {
                 expenseTypeDao.insert(type)
+            }
+        }
+
+        for (subtype in defaultExpenseSubtypes) {
+            if (expenseSubtypeDao.getAllActive().none { it.typeName == subtype.typeName }) {
+                expenseSubtypeDao.insert(subtype)
             }
         }
 
@@ -366,6 +408,7 @@ data class ExpenseSummary(
     val totalOvertimeCost: BigDecimal = BigDecimal.ZERO,
     val totalOtherExpenses: BigDecimal = BigDecimal.ZERO,
     val totalAdvanceAmount: BigDecimal = BigDecimal.ZERO,
+    val totalWeeklyPayment: BigDecimal = BigDecimal.ZERO,
     val totalExcessBalance: BigDecimal = BigDecimal.ZERO,
     val netAmount: BigDecimal = BigDecimal.ZERO,
     val totalDays: Int = 0,
@@ -379,6 +422,7 @@ data class WeeklyExpenseSummary(
     val totalOvertimeCost: BigDecimal = BigDecimal.ZERO,
     val totalOtherExpenses: BigDecimal = BigDecimal.ZERO,
     val totalAdvanceAmount: BigDecimal = BigDecimal.ZERO,
+    val totalWeeklyPayment: BigDecimal = BigDecimal.ZERO,
     val totalExcessBalance: BigDecimal = BigDecimal.ZERO,
     val netAmount: BigDecimal = BigDecimal.ZERO,
     val totalWeeks: Int = 0,

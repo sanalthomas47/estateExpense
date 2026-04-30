@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
+import com.santhomach.estateexpense.data.model.ExpenseSubtype
 import com.santhomach.estateexpense.data.model.ExpenseType
 import com.santhomach.estateexpense.data.model.IncomeType
 import com.santhomach.estateexpense.data.model.WorkerType
@@ -36,6 +37,34 @@ interface ExpenseTypeDao {
     suspend fun getAll(): List<ExpenseType>
 
     @Query("DELETE FROM expense_types")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface ExpenseSubtypeDao {
+
+    @Insert
+    suspend fun insert(expenseSubtype: ExpenseSubtype): Long
+
+    @Update
+    suspend fun update(expenseSubtype: ExpenseSubtype)
+
+    @Delete
+    suspend fun delete(expenseSubtype: ExpenseSubtype)
+
+    @Query("SELECT * FROM expense_subtypes WHERE id = :id")
+    suspend fun getById(id: Int): ExpenseSubtype?
+
+    @Query("SELECT * FROM expense_subtypes WHERE isActive = 1 ORDER BY typeName")
+    suspend fun getAllActive(): List<ExpenseSubtype>
+
+    @Query("SELECT * FROM expense_subtypes WHERE isActive = 1 ORDER BY typeName")
+    fun getAllActiveFlow(): Flow<List<ExpenseSubtype>>
+
+    @Query("SELECT * FROM expense_subtypes ORDER BY typeName")
+    suspend fun getAll(): List<ExpenseSubtype>
+
+    @Query("DELETE FROM expense_subtypes")
     suspend fun deleteAll()
 }
 

@@ -49,4 +49,7 @@ interface DailyExpenseDao {
 
     @Query("SELECT * FROM daily_expenses WHERE managerId = :managerId ORDER BY date DESC")
     suspend fun getByManager(managerId: Int): List<DailyExpense>
+
+    @Query("SELECT * FROM daily_expenses WHERE date < :date ORDER BY date ASC")
+    suspend fun getBeforeDate(date: String): List<DailyExpense>
 }

@@ -4,9 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -147,14 +146,15 @@ fun ReportsScreen(
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
 
-                        SummaryRow("Total Income", "₹${dailySummary.totalIncome}")
-                        SummaryRow("Total Labor Cost", "₹${dailySummary.totalLaborCost}")
-                        SummaryRow("Total Overtime Cost", "₹${dailySummary.totalOvertimeCost}")
-                        SummaryRow("Total Advance Paid", "₹${dailySummary.totalAdvanceAmount}")
-                        SummaryRow("Total Other Expenses", "₹${dailySummary.totalOtherExpenses}")
-                        SummaryRow("Previous Excess Balance", "₹${dailySummary.totalExcessBalance}")
+                        SummaryRow("Total Income", "₹${dailySummary.totalIncome}", icon = Icons.Default.TrendingUp, iconColor = MaterialTheme.colorScheme.primary)
+                        SummaryRow("Total Labor Cost", "₹${dailySummary.totalLaborCost}", icon = Icons.Default.Groups)
+                        SummaryRow("Total Overtime Cost", "₹${dailySummary.totalOvertimeCost}", icon = Icons.Default.AccessTime)
+                        SummaryRow("Total Advance Paid", "₹${dailySummary.totalAdvanceAmount}", icon = Icons.Default.Payments)
+                        SummaryRow("Weekly Payment Done", "₹${dailySummary.totalWeeklyPayment}", icon = Icons.Default.DoneAll)
+                        SummaryRow("Total Other Expenses", "₹${dailySummary.totalOtherExpenses}", icon = Icons.Default.ShoppingBag)
+                        SummaryRow("Previous Excess Balance", "₹${dailySummary.totalExcessBalance}", icon = Icons.Default.AccountBalanceWallet)
                         
-                        val totalExp = dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses + dailySummary.totalAdvanceAmount + dailySummary.totalExcessBalance
+                        val totalExp = dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses + dailySummary.totalAdvanceAmount + dailySummary.totalExcessBalance + dailySummary.totalWeeklyPayment
                         
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
                         SummaryRow("TOTAL EXPENSES", "₹$totalExp", isTotal = true)
@@ -178,14 +178,15 @@ fun ReportsScreen(
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
 
-                        SummaryRow("Total Income", "₹${weeklySummary.totalIncome}")
-                        SummaryRow("Total Labor Cost", "₹${weeklySummary.totalLaborCost}")
-                        SummaryRow("Total Overtime Cost", "₹${weeklySummary.totalOvertimeCost}")
-                        SummaryRow("Total Advance Paid", "₹${weeklySummary.totalAdvanceAmount}")
-                        SummaryRow("Total Other Expenses", "₹${weeklySummary.totalOtherExpenses}")
-                        SummaryRow("Previous Excess Balance", "₹${weeklySummary.totalExcessBalance}")
+                        SummaryRow("Total Income", "₹${weeklySummary.totalIncome}", icon = Icons.Default.TrendingUp, iconColor = MaterialTheme.colorScheme.primary)
+                        SummaryRow("Total Labor Cost", "₹${weeklySummary.totalLaborCost}", icon = Icons.Default.Groups)
+                        SummaryRow("Total Overtime Cost", "₹${weeklySummary.totalOvertimeCost}", icon = Icons.Default.AccessTime)
+                        SummaryRow("Total Advance Paid", "₹${weeklySummary.totalAdvanceAmount}", icon = Icons.Default.Payments)
+                        SummaryRow("Weekly Payment Done", "₹${weeklySummary.totalWeeklyPayment}", icon = Icons.Default.DoneAll)
+                        SummaryRow("Total Other Expenses", "₹${weeklySummary.totalOtherExpenses}", icon = Icons.Default.ShoppingBag)
+                        SummaryRow("Previous Excess Balance", "₹${weeklySummary.totalExcessBalance}", icon = Icons.Default.AccountBalanceWallet)
                         
-                        val totalExp = weeklySummary.totalLaborCost + weeklySummary.totalOvertimeCost + weeklySummary.totalOtherExpenses + weeklySummary.totalAdvanceAmount + weeklySummary.totalExcessBalance
+                        val totalExp = weeklySummary.totalLaborCost + weeklySummary.totalOvertimeCost + weeklySummary.totalOtherExpenses + weeklySummary.totalAdvanceAmount + weeklySummary.totalExcessBalance + weeklySummary.totalWeeklyPayment
                         
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
                         SummaryRow("TOTAL EXPENSES", "₹$totalExp", isTotal = true)
@@ -195,6 +196,54 @@ fun ReportsScreen(
                         SummaryRow("Total Weeks", weeklySummary.totalWeeks.toString())
                         SummaryRow("Avg Weekly Income", "₹${weeklySummary.averageWeeklyIncome}")
                         SummaryRow("Avg Weekly Expense", "₹${weeklySummary.averageWeeklyExpense}")
+                    }
+                }
+            }
+
+            // Weekly Worker Summary Table
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Labor Summary (Grouped)",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        val workerSummary = viewModel.getWeeklyWorkerSummary(filteredExpenses)
+                        if (workerSummary.isEmpty()) {
+                            Text("No labor data for this period", style = MaterialTheme.typography.bodyMedium)
+                        } else {
+                            // Table Header
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Type & Comment", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(2f))
+                                Text("Count", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.5f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                Text("Total Cost", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                            }
+                            Divider()
+                            workerSummary.forEach { item ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(2f)) {
+                                        Text(item.workerType, style = MaterialTheme.typography.bodyMedium)
+                                        if (item.comment.isNotEmpty()) {
+                                            Text(item.comment, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                                        }
+                                    }
+                                    Text(item.totalCount.toString(), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(0.5f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                    Text("₹${item.totalCost}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                }
+                                if (item != workerSummary.last()) {
+                                    Divider()
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -385,17 +434,30 @@ fun ReportsScreen(
 private fun SummaryRow(
     label: String,
     value: String,
-    isTotal: Boolean = false
+    isTotal: Boolean = false,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    iconColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.secondary
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = label,
-            style = if (isTotal) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = iconColor
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(
+                text = label,
+                style = if (isTotal) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium
+            )
+        }
         Text(
             text = value,
             style = if (isTotal) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,

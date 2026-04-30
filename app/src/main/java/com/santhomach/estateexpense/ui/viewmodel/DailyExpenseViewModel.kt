@@ -7,6 +7,7 @@ import com.santhomach.estateexpense.data.repository.ExpenseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -30,6 +31,9 @@ class DailyExpenseViewModel @Inject constructor(
     val expenseTypes = repository.getAllActiveExpenseTypesFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val expenseSubtypes = repository.getAllActiveExpenseSubtypesFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val incomeTypes = repository.getAllActiveIncomeTypesFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -42,6 +46,22 @@ class DailyExpenseViewModel @Inject constructor(
     val workTasks = repository.getAllActiveWorkTasksFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Previous excess balance calculated from all history BEFORE the current week
+    val previousExcessBalance = _currentExpense.flatMapLatest { expense ->
+        if (expense == null) return@flatMapLatest flowOf(BigDecimal.ZERO)
+        
+        val currentDate = try { LocalDate.parse(expense.date) } catch(e: Exception) { LocalDate.now() }
+        val currentWeekStart = currentDate.with(java.time.DayOfWeek.MONDAY)
+        val startStr = currentWeekStart.format(DateTimeFormatter.ISO_LOCAL_DATE)
+        
+        flow {
+            val previousRecords = repository.getDailyExpensesBeforeDate(startStr)
+            val totalPaid = previousRecords.fold(BigDecimal.ZERO) { acc, r -> acc + r.advanceAmount + r.weeklyPaymentDone }
+            val totalExpenses = previousRecords.fold(BigDecimal.ZERO) { acc, r -> acc + r.totalLaborCost + r.totalOvertimeCost + r.totalOtherExpensesCost }
+            emit(totalPaid - totalExpenses)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BigDecimal.ZERO)
+
     // Initialize default data on first launch
     init {
         viewModelScope.launch {
@@ -53,14 +73,30 @@ class DailyExpenseViewModel @Inject constructor(
         }
     }
 
-    fun createNewExpense(date: LocalDate = LocalDate.now()) {
-        val dateString = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
-        val newExpense = DailyExpense(
-            date = dateString,
-            createdBy = "user"
-        )
-        _currentExpense.value = newExpense
-        _uiState.update { it.copy(isEditing = true, error = null) }
+    fun loadOrCreateExpense(date: LocalDate) {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true) }
+                val dateString = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                val existingExpenses = repository.getDailyExpensesByDate(dateString)
+
+                if (existingExpenses.isNotEmpty()) {
+                    // Return the first one if multiple exist for some reason
+                    val expense = existingExpenses.first()
+                    _currentExpense.value = expense
+                    _uiState.update { it.copy(isLoading = false, isEditing = true) }
+                } else {
+                    val newExpense = DailyExpense(
+                        date = dateString,
+                        createdBy = "user"
+                    )
+                    _currentExpense.value = newExpense
+                    _uiState.update { it.copy(isLoading = false, isEditing = true, error = null) }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = e.message) }
+            }
+        }
     }
 
     fun loadExpense(id: Int) {
@@ -76,30 +112,6 @@ class DailyExpenseViewModel @Inject constructor(
         }
     }
 
-    fun updateWorkerCount(workerType: String, count: Int) {
-        _currentExpense.update { expense ->
-            expense?.copy(
-                malayaliMaleCount = if (workerType == "Malayalam Male") count else expense.malayaliMaleCount,
-                bengaliMaleCount = if (workerType == "Bengali Male") count else expense.bengaliMaleCount,
-                malayaliFemaleCount = if (workerType == "Malayalam Female") count else expense.malayaliFemaleCount,
-                bengaliFemaleCount = if (workerType == "Bengali Female") count else expense.bengaliFemaleCount
-            )
-        }
-        recalculateTotals()
-    }
-
-    fun updateWage(workerType: String, wage: BigDecimal) {
-        _currentExpense.update { expense ->
-            expense?.copy(
-                malayaliMaleWagePerDay = if (workerType == "Malayalam Male") wage else expense.malayaliMaleWagePerDay,
-                bengaliMaleWagePerDay = if (workerType == "Bengali Male") wage else expense.bengaliMaleWagePerDay,
-                malayaliFemaleWagePerDay = if (workerType == "Malayalam Female") wage else expense.malayaliFemaleWagePerDay,
-                bengaliFemaleWagePerDay = if (workerType == "Bengali Female") wage else expense.bengaliFemaleWagePerDay
-            )
-        }
-        recalculateTotals()
-    }
-
     fun updateOvertime(hours: Int) {
         _currentExpense.update { expense ->
             expense?.copy(overtimeHours = hours)
@@ -108,12 +120,12 @@ class DailyExpenseViewModel @Inject constructor(
     }
 
     fun addWorkerGroup(
-        workerTypeId: Int, 
-        count: Int, 
-        wage: BigDecimal, 
+        workerTypeId: Int,
+        count: Int,
+        wage: BigDecimal,
         overtimeHours: Int,
         overtimeWagePerHour: BigDecimal,
-        task: String, 
+        task: String,
         comments: String = ""
     ) {
         _currentExpense.update { expense ->
@@ -130,7 +142,7 @@ class DailyExpenseViewModel @Inject constructor(
                     comments = comments
                 )
                 val updatedGroups = currentGroups + newEntry
-                
+
                 it.copy(
                     workerGroups = kotlinx.serialization.json.Json.encodeToString(ListSerializer(WorkerGroupEntry.serializer()), updatedGroups)
                 )
@@ -194,39 +206,46 @@ class DailyExpenseViewModel @Inject constructor(
         }
     }
 
-    fun addNewExpenseType(typeName: String) {
+    fun addOtherExpense(expenseTypeId: Int, amount: BigDecimal, quantity: Double = 1.0, notes: String = "", customTypeName: String? = null,customSubtypeName: String? = null) {
         viewModelScope.launch {
-            repository.insertExpenseType(ExpenseType(typeName = typeName))
-        }
-    }
-
-    fun addNewIncomeType(typeName: String) {
-        viewModelScope.launch {
-            repository.insertIncomeType(IncomeType(typeName = typeName))
-        }
-    }
-
-    fun addOtherExpense(expenseTypeId: Int, amount: BigDecimal, quantity: Double = 1.0, notes: String = "") {
-        _currentExpense.update { expense ->
-            expense?.let {
-                val currentExpenses = parseOtherExpenses(it.otherExpenses)
-                val newEntry = OtherExpenseEntry(
-                    expenseTypeId = expenseTypeId,
-                    typeName = expenseTypes.value.find { type -> type.id == expenseTypeId }?.typeName ?: "Unknown",
-                    amount = amount,
-                    quantity = quantity,
-                    notes = notes
-                )
-                val updatedExpenses = currentExpenses + newEntry
-                val totalAmount = updatedExpenses.sumOf { entry -> entry.amount }
-
-                it.copy(
-                    otherExpenses = kotlinx.serialization.json.Json.encodeToString(ListSerializer(OtherExpenseEntry.serializer()), updatedExpenses),
-                    totalOtherExpensesCost = totalAmount
-                )
+            val finalTypeId: Int
+            val finalTypeName: String
+            
+            if (customTypeName != null) {
+                finalTypeId = repository.insertExpenseType(ExpenseType(typeName = customTypeName)).toInt()
+                finalTypeName = customTypeName
+            } else {
+                finalTypeId = expenseTypeId
+                finalTypeName = expenseTypes.value.find { type -> type.id == expenseTypeId }?.typeName ?: "Unknown"
             }
+
+            if(customSubtypeName != null){
+                val parentType = expenseTypes.value.find { it.id == finalTypeId }
+                    ?: ExpenseType(id = finalTypeId, typeName = finalTypeName)
+                repository.insertExpenseSubtype(ExpenseSubtype(typeName = customSubtypeName, parentTypeName = parentType))
+            }
+
+            _currentExpense.update { expense ->
+                expense?.let {
+                    val currentExpenses = parseOtherExpenses(it.otherExpenses)
+                    val newEntry = OtherExpenseEntry(
+                        expenseTypeId = finalTypeId,
+                        typeName = finalTypeName,
+                        amount = amount,
+                        quantity = quantity,
+                        notes = notes
+                    )
+                    val updatedExpenses = currentExpenses + newEntry
+                    val totalAmount = updatedExpenses.sumOf { entry -> entry.amount }
+
+                    it.copy(
+                        otherExpenses = kotlinx.serialization.json.Json.encodeToString(ListSerializer(OtherExpenseEntry.serializer()), updatedExpenses),
+                        totalOtherExpensesCost = totalAmount
+                    )
+                }
+            }
+            recalculateTotals()
         }
-        recalculateTotals()
     }
 
     fun removeOtherExpense(index: Int) {
@@ -247,61 +266,94 @@ class DailyExpenseViewModel @Inject constructor(
         recalculateTotals()
     }
 
-    fun updateOtherExpense(index: Int, expenseTypeId: Int, amount: BigDecimal, quantity: Double = 1.0, notes: String = "") {
-        _currentExpense.update { expense ->
-            expense?.let {
-                val currentExpenses = parseOtherExpenses(it.otherExpenses).toMutableList()
-                if (index in currentExpenses.indices) {
-                    val newEntry = OtherExpenseEntry(
-                        expenseTypeId = expenseTypeId,
-                        typeName = expenseTypes.value.find { type -> type.id == expenseTypeId }?.typeName ?: "Unknown",
-                        amount = amount,
-                        quantity = quantity,
-                        notes = notes
-                    )
-                    currentExpenses[index] = newEntry
-                    val totalAmount = currentExpenses.sumOf { entry -> entry.amount }
-
-                    it.copy(
-                        otherExpenses = kotlinx.serialization.json.Json.encodeToString(ListSerializer(OtherExpenseEntry.serializer()), currentExpenses),
-                        totalOtherExpensesCost = totalAmount
-                    )
-                } else it
+    fun updateOtherExpense(index: Int, expenseTypeId: Int, amount: BigDecimal, quantity: Double = 1.0, notes: String = "", customTypeName: String? = null,customSubtypeName: String? = null) {
+        viewModelScope.launch {
+            val finalTypeId: Int
+            val finalTypeName: String
+            
+            if (customTypeName != null) {
+                finalTypeId = repository.insertExpenseType(ExpenseType(typeName = customTypeName)).toInt()
+                finalTypeName = customTypeName
+            } else {
+                finalTypeId = expenseTypeId
+                finalTypeName = expenseTypes.value.find { type -> type.id == expenseTypeId }?.typeName ?: "Unknown"
             }
+            if(customSubtypeName != null){
+                val parentType = expenseTypes.value.find { it.id == finalTypeId }
+                    ?: ExpenseType(id = finalTypeId, typeName = finalTypeName)
+                val subTypeId = repository.insertExpenseSubtype(ExpenseSubtype(typeName = customSubtypeName, parentTypeName = parentType)).toInt()
+                // You can choose to store subTypeId in OtherExpenseEntry if needed
+            }
+
+            _currentExpense.update { expense ->
+                expense?.let {
+                    val currentExpenses = parseOtherExpenses(it.otherExpenses).toMutableList()
+                    if (index in currentExpenses.indices) {
+                        val newEntry = OtherExpenseEntry(
+                            expenseTypeId = finalTypeId,
+                            typeName = finalTypeName,
+                            amount = amount,
+                            quantity = quantity,
+                            notes = notes
+                        )
+                        currentExpenses[index] = newEntry
+                        val totalAmount = currentExpenses.sumOf { entry -> entry.amount }
+
+                        it.copy(
+                            otherExpenses = kotlinx.serialization.json.Json.encodeToString(ListSerializer(OtherExpenseEntry.serializer()), currentExpenses),
+                            totalOtherExpensesCost = totalAmount
+                        )
+                    } else it
+                }
+            }
+            recalculateTotals()
         }
-        recalculateTotals()
     }
 
     fun addIncome(
-        incomeTypeId: Int, 
-        amount: BigDecimal, 
+        incomeTypeId: Int,
+        amount: BigDecimal,
         weight: Double = 0.0,
         pricePerKilo: BigDecimal = BigDecimal.ZERO,
         transportationCharge: BigDecimal = BigDecimal.ZERO,
-        notes: String = ""
+        notes: String = "",
+        customTypeName: String? = null
     ) {
-        _currentExpense.update { expense ->
-            expense?.let {
-                val currentIncomes = parseIncomeEntries(it.incomeEntries)
-                val newEntry = IncomeEntry(
-                    incomeTypeId = incomeTypeId,
-                    typeName = incomeTypes.value.find { type -> type.id == incomeTypeId }?.typeName ?: "Unknown",
-                    amount = amount,
-                    weight = weight,
-                    pricePerKilo = pricePerKilo,
-                    transportationCharge = transportationCharge,
-                    notes = notes
-                )
-                val updatedIncomes = currentIncomes + newEntry
-                val totalAmount = updatedIncomes.sumOf { entry -> entry.amount }
-
-                it.copy(
-                    incomeEntries = kotlinx.serialization.json.Json.encodeToString(ListSerializer(IncomeEntry.serializer()), updatedIncomes),
-                    totalIncome = totalAmount
-                )
+        viewModelScope.launch {
+            val finalTypeId: Int
+            val finalTypeName: String
+            
+            if (customTypeName != null) {
+                finalTypeId = repository.insertIncomeType(IncomeType(typeName = customTypeName)).toInt()
+                finalTypeName = customTypeName
+            } else {
+                finalTypeId = incomeTypeId
+                finalTypeName = incomeTypes.value.find { type -> type.id == incomeTypeId }?.typeName ?: "Unknown"
             }
+
+            _currentExpense.update { expense ->
+                expense?.let {
+                    val currentIncomes = parseIncomeEntries(it.incomeEntries)
+                    val newEntry = IncomeEntry(
+                        incomeTypeId = finalTypeId,
+                        typeName = finalTypeName,
+                        amount = amount,
+                        weight = weight,
+                        pricePerKilo = pricePerKilo,
+                        transportationCharge = transportationCharge,
+                        notes = notes
+                    )
+                    val updatedIncomes = currentIncomes + newEntry
+                    val totalAmount = updatedIncomes.sumOf { entry -> entry.amount }
+
+                    it.copy(
+                        incomeEntries = kotlinx.serialization.json.Json.encodeToString(ListSerializer(IncomeEntry.serializer()), updatedIncomes),
+                        totalIncome = totalAmount
+                    )
+                }
+            }
+            recalculateTotals()
         }
-        recalculateTotals()
     }
 
     fun removeIncome(index: Int) {
@@ -329,32 +381,46 @@ class DailyExpenseViewModel @Inject constructor(
         weight: Double = 0.0,
         pricePerKilo: BigDecimal = BigDecimal.ZERO,
         transportationCharge: BigDecimal = BigDecimal.ZERO,
-        notes: String = ""
+        notes: String = "",
+        customTypeName: String? = null
     ) {
-        _currentExpense.update { expense ->
-            expense?.let {
-                val currentIncomes = parseIncomeEntries(it.incomeEntries).toMutableList()
-                if (index in currentIncomes.indices) {
-                    val newEntry = IncomeEntry(
-                        incomeTypeId = incomeTypeId,
-                        typeName = incomeTypes.value.find { type -> type.id == incomeTypeId }?.typeName ?: "Unknown",
-                        amount = amount,
-                        weight = weight,
-                        pricePerKilo = pricePerKilo,
-                        transportationCharge = transportationCharge,
-                        notes = notes
-                    )
-                    currentIncomes[index] = newEntry
-                    val totalAmount = currentIncomes.sumOf { entry -> entry.amount }
-
-                    it.copy(
-                        incomeEntries = kotlinx.serialization.json.Json.encodeToString(ListSerializer(IncomeEntry.serializer()), currentIncomes),
-                        totalIncome = totalAmount
-                    )
-                } else it
+        viewModelScope.launch {
+            val finalTypeId: Int
+            val finalTypeName: String
+            
+            if (customTypeName != null) {
+                finalTypeId = repository.insertIncomeType(IncomeType(typeName = customTypeName)).toInt()
+                finalTypeName = customTypeName
+            } else {
+                finalTypeId = incomeTypeId
+                finalTypeName = incomeTypes.value.find { type -> type.id == incomeTypeId }?.typeName ?: "Unknown"
             }
+
+            _currentExpense.update { expense ->
+                expense?.let {
+                    val currentIncomes = parseIncomeEntries(it.incomeEntries).toMutableList()
+                    if (index in currentIncomes.indices) {
+                        val newEntry = IncomeEntry(
+                            incomeTypeId = finalTypeId,
+                            typeName = finalTypeName,
+                            amount = amount,
+                            weight = weight,
+                            pricePerKilo = pricePerKilo,
+                            transportationCharge = transportationCharge,
+                            notes = notes
+                        )
+                        currentIncomes[index] = newEntry
+                        val totalAmount = currentIncomes.sumOf { entry -> entry.amount }
+
+                        it.copy(
+                            incomeEntries = kotlinx.serialization.json.Json.encodeToString(ListSerializer(IncomeEntry.serializer()), currentIncomes),
+                            totalIncome = totalAmount
+                        )
+                    } else it
+                }
+            }
+            recalculateTotals()
         }
-        recalculateTotals()
     }
 
     fun updateExcessBalance(amount: BigDecimal) {
@@ -392,10 +458,14 @@ class DailyExpenseViewModel @Inject constructor(
             expense?.let {
                 val laborCost = calculateLaborCost(it)
                 val overtimeCost = calculateOvertimeCost(it)
+                
+                val currentAdvances = parseAdvanceEntries(it.advanceEntries)
+                val totalAdvance = currentAdvances.sumOf { entry -> entry.amount }
 
                 it.copy(
                     totalLaborCost = laborCost,
-                    totalOvertimeCost = overtimeCost
+                    totalOvertimeCost = overtimeCost,
+                    advanceAmount = totalAdvance
                 )
             }
         }
@@ -423,13 +493,13 @@ class DailyExpenseViewModel @Inject constructor(
     private fun calculateOvertimeCost(expense: DailyExpense): BigDecimal {
         val groups = parseWorkerGroups(expense.workerGroups)
         val groupsOvertime = calculateTotalOvertimeFromGroups(groups)
-        
+
         val legacyWorkersCount = (expense.malayaliMaleCount + expense.bengaliMaleCount +
-                                 expense.malayaliFemaleCount + expense.bengaliFemaleCount).toBigDecimal()
-        
+                expense.malayaliFemaleCount + expense.bengaliFemaleCount).toBigDecimal()
+
         val legacyAverageRate = if (legacyWorkersCount > BigDecimal.ZERO) {
             (expense.malayaliMaleWagePerDay + expense.bengaliMaleWagePerDay +
-             expense.malayaliFemaleWagePerDay + expense.bengaliFemaleWagePerDay) / BigDecimal("4")
+                    expense.malayaliFemaleWagePerDay + expense.bengaliFemaleWagePerDay) / BigDecimal("4")
         } else BigDecimal.ZERO
 
         val legacyOvertime = legacyAverageRate * BigDecimal("1.5") * expense.overtimeHours.toBigDecimal()
@@ -520,15 +590,91 @@ class DailyExpenseViewModel @Inject constructor(
         return _currentExpense.value?.let { parseWorkerGroups(it.workerGroups) } ?: emptyList()
     }
 
-    fun getTotalCost(): BigDecimal {
+    fun updateWeeklyPaymentDone(amount: BigDecimal) {
+        _currentExpense.update { expense ->
+            expense?.copy(weeklyPaymentDone = amount)
+        }
+    }
+
+    fun addAdvanceEntry(amount: BigDecimal, reason: String, recipient: String) {
+        _currentExpense.update { expense ->
+            expense?.let {
+                val current = parseAdvanceEntries(it.advanceEntries)
+                val newEntry = AdvanceEntry(amount = amount, reason = reason, recipientName = recipient)
+                val updated = current + newEntry
+                val totalAmount = updated.sumOf { entry -> entry.amount }
+                it.copy(
+                    advanceEntries = kotlinx.serialization.json.Json.encodeToString(ListSerializer(AdvanceEntry.serializer()), updated),
+                    advanceAmount = totalAmount
+                )
+            }
+        }
+    }
+
+    fun removeAdvanceEntry(index: Int) {
+        _currentExpense.update { expense ->
+            expense?.let {
+                val current = parseAdvanceEntries(it.advanceEntries)
+                if (index in current.indices) {
+                    val updated = current.toMutableList().apply { removeAt(index) }
+                    val totalAmount = updated.sumOf { entry -> entry.amount }
+                    it.copy(
+                        advanceEntries = kotlinx.serialization.json.Json.encodeToString(ListSerializer(AdvanceEntry.serializer()), updated),
+                        advanceAmount = totalAmount
+                    )
+                } else it
+            }
+        }
+    }
+
+    fun updateAdvanceEntry(index: Int, amount: BigDecimal, reason: String, recipient: String) {
+        _currentExpense.update { expense ->
+            expense?.let {
+                val current = parseAdvanceEntries(it.advanceEntries).toMutableList()
+                if (index in current.indices) {
+                    val newEntry = AdvanceEntry(amount = amount, reason = reason, recipientName = recipient)
+                    current[index] = newEntry
+                    val totalAmount = current.sumOf { entry -> entry.amount }
+                    it.copy(
+                        advanceEntries = kotlinx.serialization.json.Json.encodeToString(ListSerializer(AdvanceEntry.serializer()), current),
+                        advanceAmount = totalAmount
+                    )
+                } else it
+            }
+        }
+    }
+
+    private fun parseAdvanceEntries(json: String): List<AdvanceEntry> {
+        return try {
+            if (json.isBlank() || json == "[]") emptyList()
+            else kotlinx.serialization.json.Json.decodeFromString(ListSerializer(AdvanceEntry.serializer()), json)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun getAdvanceEntries(): List<AdvanceEntry> {
+        return _currentExpense.value?.let { parseAdvanceEntries(it.advanceEntries) } ?: emptyList()
+    }
+
+    fun getTotalActualExpenses(): BigDecimal {
         return _currentExpense.value?.let {
-            // Excess balance is a carry-over fund (unused money), so it reduces the net cash requirement for expenses today
-            (it.totalLaborCost + it.totalOvertimeCost + it.totalOtherExpensesCost + it.advanceAmount) - it.excessBalance
+            it.totalLaborCost + it.totalOvertimeCost + it.totalOtherExpensesCost
+        } ?: BigDecimal.ZERO
+    }
+
+    fun getTotalPaymentsMade(): BigDecimal {
+        return _currentExpense.value?.let {
+            it.advanceAmount + it.weeklyPaymentDone
         } ?: BigDecimal.ZERO
     }
 
     fun getNetAmount(): BigDecimal {
-        return _currentExpense.value?.calculateNetAmount() ?: BigDecimal.ZERO
+        val expenses = getTotalActualExpenses()
+        val payments = getTotalPaymentsMade()
+        val previousExcess = previousExcessBalance.value
+        // Offset logic: (Current Payments + Carry-over) - Actual Costs
+        return (payments + previousExcess) - expenses
     }
 }
 

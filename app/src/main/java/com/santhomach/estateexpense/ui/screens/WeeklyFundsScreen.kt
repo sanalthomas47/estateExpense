@@ -82,15 +82,28 @@ fun WeeklyFundsScreen(
                         
                         SummaryRow("Funds Received", "₹${funds.amountReceived}")
                         
+                        if (funds.paymentMade > BigDecimal.ZERO) {
+                            SummaryRow("Payment Made", "₹${funds.paymentMade}")
+                        }
+
                         comparison?.let { comp ->
                             SummaryRow("Total Expenses", "₹${comp.totalExpenses}")
                             
-                            val balance = funds.amountReceived - comp.totalExpenses
+                            val netBalance = funds.paymentMade - comp.totalExpenses
                             SummaryRow(
-                                label = if (balance >= BigDecimal.ZERO) "Excess Balance" else "Shortfall",
-                                value = "₹${balance.abs()}",
-                                isPositive = balance >= BigDecimal.ZERO
+                                label = if (netBalance >= BigDecimal.ZERO) "Excess Balance" else "Shortfall",
+                                value = "₹${netBalance.abs()}",
+                                isPositive = netBalance >= BigDecimal.ZERO
                             )
+
+                            if (netBalance > BigDecimal.ZERO) {
+                                Text(
+                                    text = "This excess will carry over to next week",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
                         } ?: CircularProgressIndicator(modifier = Modifier.size(16.dp))
 
                         if (funds.notes.isNotEmpty()) {
@@ -132,8 +145,8 @@ fun WeeklyFundsScreen(
     if (showAddDialog) {
         AddFundsDialog(
             onDismiss = { showAddDialog = false },
-            onConfirm = { amount, date, notes ->
-                viewModel.addFunds(amount, date, notes)
+            onConfirm = { amount, paymentMade, date, notes ->
+                viewModel.addFunds(amount, paymentMade, date, notes)
                 showAddDialog = false
             }
         )
@@ -146,12 +159,13 @@ fun WeeklyFundsScreen(
                     showEditDialog = false
                     selectedFundsForEdit = null
                 },
-                onConfirm = { amount, date, notes ->
-                    viewModel.updateFunds(funds.id, amount, notes)
+                onConfirm = { amount, paymentMade, date, notes ->
+                    viewModel.updateFunds(funds.id, amount, paymentMade, notes)
                     showEditDialog = false
                     selectedFundsForEdit = null
                 },
                 initialAmount = funds.amountReceived.toString(),
+                initialPaymentMade = funds.paymentMade.toString(),
                 initialDate = LocalDate.parse(funds.weekStartDate),
                 initialNotes = funds.notes
             )
@@ -209,12 +223,14 @@ private fun SummaryRow(label: String, value: String, isPositive: Boolean? = null
 @Composable
 fun AddFundsDialog(
     onDismiss: () -> Unit,
-    onConfirm: (BigDecimal, LocalDate, String) -> Unit,
+    onConfirm: (BigDecimal, BigDecimal, LocalDate, String) -> Unit,
     initialAmount: String = "",
+    initialPaymentMade: String = "",
     initialDate: LocalDate = LocalDate.now(),
     initialNotes: String = ""
 ) {
     var amount by remember { mutableStateOf(initialAmount) }
+    var paymentMade by remember { mutableStateOf(initialPaymentMade) }
     var notes by remember { mutableStateOf(initialNotes) }
     var date by remember { mutableStateOf(initialDate) }
 
@@ -227,6 +243,14 @@ fun AddFundsDialog(
                     value = amount,
                     onValueChange = { amount = it },
                     label = { Text("Amount Received (₹)") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                OutlinedTextField(
+                    value = paymentMade,
+                    onValueChange = { paymentMade = it },
+                    label = { Text("Payment Made (₹) - Thursday") },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -247,7 +271,14 @@ fun AddFundsDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(amount.toBigDecimalOrNull() ?: BigDecimal.ZERO, date, notes) },
+                onClick = { 
+                    onConfirm(
+                        amount.toBigDecimalOrNull() ?: BigDecimal.ZERO, 
+                        paymentMade.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+                        date, 
+                        notes
+                    ) 
+                },
                 enabled = amount.isNotEmpty()
             ) {
                 Text("Save")

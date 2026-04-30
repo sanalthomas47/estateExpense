@@ -1,5 +1,6 @@
 package com.santhomach.estateexpense.data.model
 
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -20,6 +21,19 @@ data class ExpenseType(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val typeName: String,
+    val description: String = "",
+    val isActive: Boolean = true,
+    val createdAt: String = LocalDateTime.now().toString()
+)
+
+@Entity(tableName = "expense_subtypes")
+@Serializable
+data class ExpenseSubtype(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+    val typeName: String,
+    @Embedded(prefix = "parent_")
+    val parentTypeName: ExpenseType,
     val description: String = "",
     val isActive: Boolean = true,
     val createdAt: String = LocalDateTime.now().toString()
@@ -168,6 +182,13 @@ data class DailyExpense(
     // Worker groups with tasks and comments (stored as JSON)
     val workerGroups: String = "[]", // JSON array of WorkerGroupEntry
 
+    // Multiple advances
+    val advanceEntries: String = "[]", // JSON array of AdvanceEntry
+    
+    // Payment done for the week (Thursday settlement usually)
+    @Serializable(with = BigDecimalSerializer::class)
+    val weeklyPaymentDone: BigDecimal = BigDecimal.ZERO,
+
     // Metadata
     val managerId: Int? = null,
     val comments: String = "",
@@ -180,10 +201,19 @@ data class DailyExpense(
 ) {
     // Convenience function to calculate net (income - expenses)
     fun calculateNetAmount(): BigDecimal {
-        val totalExpenses = totalLaborCost + totalOvertimeCost + totalOtherExpensesCost + advanceAmount
+        val totalExpenses = totalLaborCost + totalOvertimeCost + totalOtherExpensesCost + advanceAmount + weeklyPaymentDone
         return totalIncome - totalExpenses
     }
 }
+
+@Serializable
+data class AdvanceEntry(
+    @Serializable(with = BigDecimalSerializer::class)
+    val amount: BigDecimal,
+    val reason: String = "",
+    val recipientName: String = "",
+    val addedAt: String = LocalDateTime.now().toString()
+)
 
 @Serializable
 data class WorkerGroupEntry(
@@ -334,6 +364,8 @@ data class WeeklyFunds(
     val weekStartDate: String, // ISO format (typically Monday)
     @Serializable(with = BigDecimalSerializer::class)
     val amountReceived: BigDecimal,
+    @Serializable(with = BigDecimalSerializer::class)
+    val paymentMade: BigDecimal = BigDecimal.ZERO, // Payment made on Thursday for the week
     val notes: String = "",
     val createdAt: String = LocalDateTime.now().toString()
 )

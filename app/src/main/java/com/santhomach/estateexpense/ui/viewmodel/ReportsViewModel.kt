@@ -176,6 +176,31 @@ class ReportsViewModel @Inject constructor(
 
         return breakdownMap.values.sortedByDescending { it.totalAmount }
     }
+
+    fun getWeeklyWorkerSummary(expenses: List<DailyExpense>): List<WorkerTypeSummary> {
+        val summaryMap = mutableMapOf<Pair<String, String>, WorkerTypeSummary>()
+
+        expenses.forEach { expense ->
+            try {
+                val groups = kotlinx.serialization.json.Json.decodeFromString(
+                    kotlinx.serialization.builtins.ListSerializer(com.santhomach.estateexpense.data.model.WorkerGroupEntry.serializer()),
+                    expense.workerGroups
+                )
+                groups.forEach { group ->
+                    val key = Pair(group.workerTypeName, group.comments)
+                    val current = summaryMap.getOrDefault(key, WorkerTypeSummary(group.workerTypeName, group.comments))
+                    summaryMap[key] = current.copy(
+                        totalCount = current.totalCount + group.count,
+                        totalCost = current.totalCost + group.calculateTotalGroupCost()
+                    )
+                }
+            } catch (e: Exception) {
+                // Skip
+            }
+        }
+
+        return summaryMap.values.sortedWith(compareBy({ it.workerType }, { it.comment }))
+    }
 }
 
 // UI State and Data Classes
@@ -209,4 +234,11 @@ data class IncomeBreakdown(
     val commodityName: String,
     val totalAmount: java.math.BigDecimal = java.math.BigDecimal.ZERO,
     val totalWeight: Double = 0.0
+)
+
+data class WorkerTypeSummary(
+    val workerType: String,
+    val comment: String,
+    val totalCount: Int = 0,
+    val totalCost: java.math.BigDecimal = java.math.BigDecimal.ZERO
 )

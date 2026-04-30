@@ -3,11 +3,10 @@ package com.santhomach.estateexpense.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -107,11 +106,8 @@ fun HomeScreenContent(
             TopAppBar(
                 title = { Text("Estate Expense Tracker") },
                 actions = {
-                    IconButton(onClick = { /* Nothing to save here */ }) {
-                        Icon(Icons.Filled.Save, contentDescription = "Save")
-                    }
                     IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
             )
@@ -133,13 +129,22 @@ fun HomeScreenContent(
             ) {
             // Quick Stats Card
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f))
+                ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Today's Summary",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Insights, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Today's Summary",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -148,12 +153,14 @@ fun HomeScreenContent(
                             StatItem(
                                 label = "Income",
                                 value = "₹${dailySummary.totalIncome}",
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.primary,
+                                icon = Icons.Default.TrendingUp
                             )
                             StatItem(
                                 label = "Expenses",
-                                value = "₹${dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses + dailySummary.totalAdvanceAmount + dailySummary.totalExcessBalance}",
-                                color = MaterialTheme.colorScheme.error
+                                value = "₹${dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses + dailySummary.totalAdvanceAmount + dailySummary.totalExcessBalance + dailySummary.totalWeeklyPayment}",
+                                color = MaterialTheme.colorScheme.error,
+                                icon = Icons.Default.TrendingDown
                             )
                         }
                     }
@@ -178,20 +185,17 @@ fun HomeScreenContent(
                                 onClick = { onNavigateToExpenseEntry(LocalDate.now(), null) },
                                 modifier = Modifier.weight(1f)
                             ) {
+                                Icon(Icons.Default.Today, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text("Add Today")
-                            }
-
-                            OutlinedButton(
-                                onClick = { onNavigateToExpenseEntry(LocalDate.now().plusDays(1), null) },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Add Tomorrow")
                             }
 
                             OutlinedButton(
                                 onClick = onShowDatePicker,
                                 modifier = Modifier.weight(1f)
                             ) {
+                                Icon(Icons.Default.CalendarMonth, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text("Add for Date")
                             }
                         }
@@ -204,23 +208,47 @@ fun HomeScreenContent(
                         ) {
                             Button(
                                 onClick = onNavigateToReports,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                             ) {
-                                Text("Reports")
+                                Icon(Icons.Default.BarChart, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Reports",
+                                    fontSize = MaterialTheme.typography.labelSmall.fontSize,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
                             }
 
                             Button(
                                 onClick = onNavigateToPayments,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                             ) {
-                                Text("Payments")
+                                Icon(Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Payments",
+                                    fontSize = MaterialTheme.typography.labelSmall.fontSize,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
                             }
 
                             Button(
                                 onClick = onNavigateToWeeklyFunds,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                             ) {
-                                Text("Weekly")
+                                Icon(Icons.Default.ListAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Weekly",
+                                    fontSize = MaterialTheme.typography.labelSmall.fontSize,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
                             }
                         }
                     }
@@ -270,14 +298,14 @@ fun HomeScreenContent(
                             )
                             Row {
                                 Text(
-                                    text = "Exp: ₹${expense.totalLaborCost + expense.totalOvertimeCost + expense.totalOtherExpensesCost + expense.advanceAmount + expense.excessBalance}",
-                                    style = MaterialTheme.typography.labelSmall,
+                                    text = "Exp: ₹${expense.totalLaborCost + expense.totalOvertimeCost + expense.totalOtherExpensesCost + expense.advanceAmount + expense.excessBalance + expense.weeklyPaymentDone}",
+                                    style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.error
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Text(
                                     text = "Inc: ₹${expense.totalIncome}",
-                                    style = MaterialTheme.typography.labelSmall,
+                                    style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -339,20 +367,32 @@ fun HomeScreenContent(
 private fun StatItem(
     label: String,
     value: String,
-    color: androidx.compose.ui.graphics.Color
+    color: androidx.compose.ui.graphics.Color,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = color
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         Text(
             text = value,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.titleMedium,
             color = color
         )
     }

@@ -1,8 +1,11 @@
 package com.santhomach.estateexpense.ui.screens
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -77,61 +80,74 @@ fun WorkerPaymentScreen(
                 )
             }
 
-            items(payments) { payment ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(text = payment.workerName, style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                text = "₹${payment.amount}",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(text = payment.paymentType, style = MaterialTheme.typography.bodySmall)
-                            Text(
-                                text = try {
-                                    LocalDate.parse(payment.paymentDate).format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
-                                } catch (e: Exception) {
-                                    payment.paymentDate
-                                },
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        if (payment.notes.isNotEmpty()) {
-                            Text(
-                                text = payment.notes,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        // Action buttons for edit/delete
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            TextButton(onClick = {
-                                selectedPaymentForEdit = payment
-                                showEditDialog = true
-                            }) {
-                                Text("Edit")
-                            }
-                            TextButton(
-                                onClick = {
-                                    selectedPaymentForDelete = payment
-                                    showDeleteDialog = true
-                                },
-                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            itemsIndexed(payments) { index, payment ->
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn(animationSpec = tween(300)) + slideInVertically(
+                        initialOffsetY = { 50 },
+                        animationSpec = tween(300, delayMillis = index * 50)
+                    ),
+                    exit = fadeOut(animationSpec = tween(200))
+                ) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateContentSize()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Delete")
+                                Text(text = payment.workerName, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    text = "₹${payment.amount}",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(text = payment.paymentType, style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    text = try {
+                                        LocalDate.parse(payment.paymentDate).format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
+                                    } catch (e: Exception) {
+                                        payment.paymentDate
+                                    },
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            if (payment.notes.isNotEmpty()) {
+                                Text(
+                                    text = payment.notes,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            // Action buttons for edit/delete
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                TextButton(onClick = {
+                                    selectedPaymentForEdit = payment
+                                    showEditDialog = true
+                                }) {
+                                    Text("Edit")
+                                }
+                                TextButton(
+                                    onClick = {
+                                        selectedPaymentForDelete = payment
+                                        showDeleteDialog = true
+                                    },
+                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                ) {
+                                    Text("Delete")
+                                }
                             }
                         }
                     }
@@ -259,7 +275,7 @@ fun RecordPaymentDialog(
                         readOnly = true,
                         label = { Text("Worker / Manager") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = workerExpanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true).fillMaxWidth()
                     )
                     ExposedDropdownMenu(
                         expanded = workerExpanded,
@@ -297,7 +313,7 @@ fun RecordPaymentDialog(
                         readOnly = true,
                         label = { Text("Payment Type") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true).fillMaxWidth()
                     )
                     ExposedDropdownMenu(
                         expanded = typeExpanded,

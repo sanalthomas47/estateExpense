@@ -81,6 +81,10 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.hilt.navigation.compose)
 
+    // Animation
+    implementation(libs.androidx.compose.animation)
+    implementation(libs.androidx.compose.animation.core)
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.androidx.room.testing)

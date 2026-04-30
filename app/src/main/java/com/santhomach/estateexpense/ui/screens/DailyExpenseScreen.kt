@@ -6,9 +6,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,10 +42,13 @@ fun DailyExpenseScreen(
     val uiState by viewModel.uiState.collectAsState()
     val currentExpense by viewModel.currentExpense.collectAsState()
     val expenseTypes by viewModel.expenseTypes.collectAsState()
+    val expenseSubtypes by viewModel.expenseSubtypes.collectAsState()
     val incomeTypes by viewModel.incomeTypes.collectAsState()
     val workerTypes by viewModel.workerTypes.collectAsState()
     val permanentWorkers by viewModel.permanentWorkers.collectAsState()
     val workTasks by viewModel.workTasks.collectAsState()
+
+    val previousExcessBalance by viewModel.previousExcessBalance.collectAsState()
 
     val scrollState = rememberScrollState()
 
@@ -62,6 +64,9 @@ fun DailyExpenseScreen(
     var editingIncomeIndex by remember { mutableStateOf<Int?>(null) }
     var showAddIncomeDialog by remember { mutableStateOf(false) }
 
+    var editingAdvanceIndex by remember { mutableStateOf<Int?>(null) }
+    var showAddAdvanceDialog by remember { mutableStateOf(false) }
+
     val workerGroups = remember(currentExpense) {
         viewModel.getWorkerGroups()
     }
@@ -74,12 +79,16 @@ fun DailyExpenseScreen(
         viewModel.getIncomeEntries()
     }
 
+    val advanceEntries = remember(currentExpense) {
+        viewModel.getAdvanceEntries()
+    }
+
     // Load expense if editing
-    LaunchedEffect(expenseId) {
+    LaunchedEffect(expenseId, date) {
         if (expenseId != null) {
             viewModel.loadExpense(expenseId)
         } else {
-            viewModel.createNewExpense(date)
+            viewModel.loadOrCreateExpense(date)
         }
     }
 
@@ -94,14 +103,15 @@ fun DailyExpenseScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (expenseId != null) "Edit Expense" else "Add Daily Expense") },
+                title = { Text(if (expenseId != null || (currentExpense != null && currentExpense!!.id != 0)) "Edit Expense" else "Add Daily Expense") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    if (expenseId != null) {
+                    val isExistingExpense = expenseId != null || (currentExpense != null && currentExpense!!.id != 0)
+                    if (isExistingExpense) {
                         var showDeleteDialog by remember { mutableStateOf(false) }
                         IconButton(onClick = { showDeleteDialog = true }) {
                             Icon(
@@ -152,7 +162,8 @@ fun DailyExpenseScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Manager Selection
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "General Details",
@@ -165,12 +176,15 @@ fun DailyExpenseScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
+
                     OutlinedTextField(
-                        value = (currentExpense?.excessBalance ?: BigDecimal.ZERO).toString(),
-                        onValueChange = { viewModel.updateExcessBalance(it.toBigDecimalOrNull() ?: BigDecimal.ZERO) },
+                        value = previousExcessBalance.toString(),
+                        onValueChange = { /* Read-only */ },
                         label = { Text("Previous Excess Balance (₹)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        readOnly = true,
+                        enabled = false
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -216,13 +230,17 @@ fun DailyExpenseScreen(
             }
 
             // Worker Groups Section
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Worker Groups & Tasks",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Payments, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Worker Groups & Tasks",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
 
                     workerGroups.forEachIndexed { index, group ->
                         WorkerGroupItemRow(
@@ -243,6 +261,8 @@ fun DailyExpenseScreen(
                         onClick = { showAddWorkerGroupDialog = true },
                         modifier = Modifier.fillMaxWidth()
                     ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text("Add Worker Group")
                     }
 
@@ -256,13 +276,17 @@ fun DailyExpenseScreen(
             }
 
             // Overtime Section (Legacy - but keeping for compatibility)
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Extra Overtime",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Payments, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Extra Overtime",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
 
                     OutlinedTextField(
                         value = (currentExpense?.overtimeHours ?: 0).toString(),
@@ -281,13 +305,17 @@ fun DailyExpenseScreen(
             }
 
             // Other Expenses Section
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Other Expenses",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Payments, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Other Expenses",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
 
                     otherExpenses.forEachIndexed { index, expense ->
                         ExpenseItemRow(
@@ -301,6 +329,8 @@ fun DailyExpenseScreen(
                         onClick = { showAddOtherExpenseDialog = true },
                         modifier = Modifier.fillMaxWidth()
                     ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text("Add Expense")
                     }
 
@@ -314,13 +344,18 @@ fun DailyExpenseScreen(
             }
 
             // Income Section
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Income",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Payments, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Income",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
 
                     incomeEntries.forEachIndexed { index, income ->
                         IncomeItemRow(
@@ -334,6 +369,8 @@ fun DailyExpenseScreen(
                         onClick = { showAddIncomeDialog = true },
                         modifier = Modifier.fillMaxWidth()
                     ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text("Add Income")
                     }
 
@@ -347,34 +384,80 @@ fun DailyExpenseScreen(
             }
 
             // Advance Section
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Payments, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Advance Payments",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    advanceEntries.forEachIndexed { index, advance ->
+                        AdvanceItemRow(
+                            advance = advance,
+                            onRemove = { viewModel.removeAdvanceEntry(index) },
+                            onEdit = { editingAdvanceIndex = index }
+                        )
+                        if (index < advanceEntries.size - 1) {
+                            Divider(modifier = Modifier.padding(vertical = 4.dp))
+                        }
+                    }
+
+                    if (advanceEntries.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    OutlinedButton(
+                        onClick = { showAddAdvanceDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Add Advance")
+                    }
+
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    Text(
+                        text = "Total Advance: ₹${currentExpense?.advanceAmount ?: BigDecimal.ZERO}",
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                }
+            }
+
+            // Adjustments Section
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Adjustments",
+                        text = "Weekly Settlement",
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
                     OutlinedTextField(
-                        value = (currentExpense?.advanceAmount ?: BigDecimal.ZERO).toString(),
-                        onValueChange = { viewModel.updateAdvanceAmount(it.toBigDecimalOrNull() ?: BigDecimal.ZERO) },
-                        label = { Text("Advance Paid (₹)") },
+                        value = (currentExpense?.weeklyPaymentDone ?: BigDecimal.ZERO).toString(),
+                        onValueChange = { viewModel.updateWeeklyPaymentDone(it.toBigDecimalOrNull() ?: BigDecimal.ZERO) },
+                        label = { Text("Payment Done for the Week (₹)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = currentExpense?.advanceReason ?: "",
-                        onValueChange = { viewModel.updateAdvanceReason(it) },
-                        label = { Text("Reason for Advance (Comment)") },
                         modifier = Modifier.fillMaxWidth(),
-                        minLines = 2
+                        prefix = { Text("₹") },
+                        supportingText = { Text("Amount paid to manager/workers for the full week") }
                     )
                 }
             }
 
             // Comments Section
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "Daily Comments",
@@ -428,13 +511,30 @@ fun DailyExpenseScreen(
 
                     SummaryRow("Total Labor", "₹${currentExpense?.totalLaborCost ?: BigDecimal.ZERO}")
                     SummaryRow("Total Overtime", "₹${currentExpense?.totalOvertimeCost ?: BigDecimal.ZERO}")
-                    SummaryRow("Advance Amount", "₹${currentExpense?.advanceAmount ?: BigDecimal.ZERO}")
                     SummaryRow("Other Expenses", "₹${currentExpense?.totalOtherExpensesCost ?: BigDecimal.ZERO}")
-                    SummaryRow("Previous Excess Balance", "₹${currentExpense?.excessBalance ?: BigDecimal.ZERO}")
                     
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    Divider(modifier = Modifier.padding(vertical = 4.dp))
+                    SummaryRow("TOTAL ACTUAL COSTS", "₹${viewModel.getTotalActualExpenses()}", isTotal = true)
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(text = "Payments & Offset", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    
+                    SummaryRow("Previous Excess/Deficit", "₹$previousExcessBalance")
+                    SummaryRow("Total Advances Paid", "₹${currentExpense?.advanceAmount ?: BigDecimal.ZERO}")
+                    SummaryRow("Weekly Settlement Done", "₹${currentExpense?.weeklyPaymentDone ?: BigDecimal.ZERO}")
+                    
+                    Divider(modifier = Modifier.padding(vertical = 4.dp))
+                    val totalPayments = viewModel.getTotalPaymentsMade()
+                    SummaryRow("TOTAL PAYMENTS", "₹$totalPayments", isTotal = true)
+                    
+                    val netRemaining = viewModel.getNetAmount()
+                    SummaryRow(
+                        label = if (netRemaining >= BigDecimal.ZERO) "REMAINING BALANCE (Excess)" else "REMAINING DEFICIT",
+                        value = "₹${netRemaining.abs()}",
+                        isTotal = true
+                    )
 
-                    SummaryRow("TOTAL EXPENSES", "₹${viewModel.getTotalCost()}", isTotal = true)
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
                     SummaryRow("TOTAL INCOME", "₹${currentExpense?.totalIncome ?: BigDecimal.ZERO}", isTotal = true)
                 }
             }
@@ -507,20 +607,20 @@ fun DailyExpenseScreen(
         val initialExpense = editingOtherExpenseIndex?.let { otherExpenses.getOrNull(it) }
         AddExpenseDialog(
             expenseTypes = expenseTypes,
+            expenseSubtypes = expenseSubtypes,
             onDismiss = { 
                 showAddOtherExpenseDialog = false
                 editingOtherExpenseIndex = null
             },
-            onConfirm = { typeId, amount, quantity, notes ->
+            onConfirm = { typeId, customName,customSubtype, amount, quantity, notes ->
                 if (editingOtherExpenseIndex != null) {
-                    viewModel.updateOtherExpense(editingOtherExpenseIndex!!, typeId, amount, quantity, notes)
+                    viewModel.updateOtherExpense(editingOtherExpenseIndex!!, typeId, amount, quantity, notes, customName,customSubtype)
                 } else {
-                    viewModel.addOtherExpense(typeId, amount, quantity, notes)
+                    viewModel.addOtherExpense(typeId, amount, quantity, notes, customName,customSubtype)
                 }
                 showAddOtherExpenseDialog = false
                 editingOtherExpenseIndex = null
             },
-            onAddNewType = { viewModel.addNewExpenseType(it) },
             initialExpense = initialExpense
         )
     }
@@ -533,19 +633,143 @@ fun DailyExpenseScreen(
                 showAddIncomeDialog = false
                 editingIncomeIndex = null
             },
-            onConfirm = { typeId, amount, weight, price, transport, notes ->
+            onConfirm = { typeId, customName, amount, weight, price, transport, notes ->
                 if (editingIncomeIndex != null) {
-                    viewModel.updateIncome(editingIncomeIndex!!, typeId, amount, weight, price, transport, notes)
+                    viewModel.updateIncome(editingIncomeIndex!!, typeId, amount, weight, price, transport, notes, customName)
                 } else {
-                    viewModel.addIncome(typeId, amount, weight, price, transport, notes)
+                    viewModel.addIncome(typeId, amount, weight, price, transport, notes, customName)
                 }
                 showAddIncomeDialog = false
                 editingIncomeIndex = null
             },
-            onAddNewType = { viewModel.addNewIncomeType(it) },
             initialIncome = initialIncome
         )
     }
+
+    if (showAddAdvanceDialog || editingAdvanceIndex != null) {
+        val initialAdvance = editingAdvanceIndex?.let { advanceEntries.getOrNull(it) }
+        AddAdvanceDialog(
+            onDismiss = {
+                showAddAdvanceDialog = false
+                editingAdvanceIndex = null
+            },
+            onConfirm = { amount, reason, recipient ->
+                if (editingAdvanceIndex != null) {
+                    viewModel.updateAdvanceEntry(editingAdvanceIndex!!, amount, reason, recipient)
+                } else {
+                    viewModel.addAdvanceEntry(amount, reason, recipient)
+                }
+                showAddAdvanceDialog = false
+                editingAdvanceIndex = null
+            },
+            initialAdvance = initialAdvance
+        )
+    }
+}
+
+@Composable
+private fun AdvanceItemRow(
+    advance: com.santhomach.estateexpense.data.model.AdvanceEntry,
+    onRemove: () -> Unit,
+    onEdit: () -> Unit = {}
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = if (advance.recipientName.isNotEmpty()) "To: ${advance.recipientName}" else "Advance",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            if (advance.reason.isNotEmpty()) {
+                Text(
+                    text = advance.reason,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(text = "₹${advance.amount}", style = MaterialTheme.typography.bodyMedium)
+            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Edit",
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Remove",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddAdvanceDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (BigDecimal, String, String) -> Unit,
+    initialAdvance: com.santhomach.estateexpense.data.model.AdvanceEntry? = null
+) {
+    var amount by remember { mutableStateOf(initialAdvance?.amount?.toString() ?: "") }
+    var reason by remember { mutableStateOf(initialAdvance?.reason ?: "") }
+    var recipient by remember { mutableStateOf(initialAdvance?.recipientName ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (initialAdvance == null) "Add Advance Payment" else "Edit Advance Payment") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    label = { Text("Amount (₹)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = recipient,
+                    onValueChange = { recipient = it },
+                    label = { Text("Recipient Name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it },
+                    label = { Text("Reason / Note") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val amountValue = amount.toBigDecimalOrNull() ?: BigDecimal.ZERO
+                    onConfirm(amountValue, reason, recipient)
+                },
+                enabled = amount.isNotEmpty()
+            ) {
+                Text(if (initialAdvance == null) "Add" else "Update")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -584,21 +808,28 @@ private fun WorkerGroupItemRow(
                 )
             }
         }
-        Column(horizontalAlignment = Alignment.End) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
             Text(
                 text = "₹${group.calculateTotalGroupCost()}",
                 style = MaterialTheme.typography.bodyMedium
             )
-            Row {
-                TextButton(onClick = onEdit) {
-                    Text("Edit", fontSize = androidx.compose.material3.MaterialTheme.typography.labelSmall.fontSize)
-                }
-                TextButton(
-                    onClick = onRemove,
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Delete", fontSize = androidx.compose.material3.MaterialTheme.typography.labelSmall.fontSize)
-                }
+            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = "Edit",
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = "Remove",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
@@ -812,19 +1043,24 @@ private fun ExpenseItemRow(
             }
         }
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(text = "₹${expense.amount}", style = MaterialTheme.typography.bodyMedium)
-            TextButton(onClick = onEdit) {
-                Text("Edit", fontSize = androidx.compose.material3.MaterialTheme.typography.labelSmall.fontSize)
+            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = "Edit",
+                    modifier = Modifier.size(18.dp)
+                )
             }
-            TextButton(
-                onClick = onRemove,
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                modifier = Modifier.height(24.dp)
-            ) {
-                Text("Delete", fontSize = androidx.compose.material3.MaterialTheme.typography.labelSmall.fontSize)
+            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = "Remove",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
@@ -858,19 +1094,25 @@ private fun IncomeItemRow(
                 Text(text = income.notes, style = MaterialTheme.typography.bodySmall)
             }
         }
-        Column(horizontalAlignment = Alignment.End) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
             Text(text = "₹${income.amount}", style = MaterialTheme.typography.bodyMedium)
-            Row {
-                TextButton(onClick = onEdit) {
-                    Text("Edit", fontSize = androidx.compose.material3.MaterialTheme.typography.labelSmall.fontSize)
-                }
-                IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        contentDescription = "Remove",
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
+            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = "Edit",
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = "Remove",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
@@ -880,43 +1122,58 @@ private fun IncomeItemRow(
 @Composable
 private fun AddExpenseDialog(
     expenseTypes: List<com.santhomach.estateexpense.data.model.ExpenseType>,
+    expenseSubtypes: List<com.santhomach.estateexpense.data.model.ExpenseSubtype>,
     onDismiss: () -> Unit,
-    onConfirm: (Int, BigDecimal, Double, String) -> Unit,
-    onAddNewType: (String) -> Unit,
+    onConfirm: (Int, String?, String?, BigDecimal, Double, String) -> Unit,
     initialExpense: OtherExpenseEntry? = null
 ) {
     var selectedTypeId by remember { mutableStateOf(initialExpense?.expenseTypeId ?: expenseTypes.firstOrNull()?.id ?: 0) }
+    var selectedSubtypeName by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf(initialExpense?.amount?.toString() ?: "") }
     var quantity by remember { mutableStateOf(initialExpense?.quantity?.toString() ?: "1") }
     var notes by remember { mutableStateOf(initialExpense?.notes ?: "") }
     var customType by remember { mutableStateOf("") }
-    var isCustomType by remember { mutableStateOf(initialExpense != null && expenseTypes.none { it.id == initialExpense.expenseTypeId }) }
+    var customSubtype by remember { mutableStateOf("") }
+    var isCustomType by remember { mutableStateOf(false) }
+    var isCustomSubtype by remember { mutableStateOf(false) }
+
+    val filteredSubtypes = remember(selectedTypeId, expenseSubtypes, expenseTypes) {
+        val selectedType = expenseTypes.find { it.id == selectedTypeId }
+        if (selectedType != null) {
+            expenseSubtypes.filter { it.parentTypeName.typeName == selectedType.typeName }
+        } else {
+            emptyList()
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (initialExpense == null) "Add Expense" else "Edit Expense") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 // Expense Type Dropdown
-                var expanded by remember { mutableStateOf(false) }
+                var typeExpanded by remember { mutableStateOf(false) }
                 val selectedType = expenseTypes.find { it.id == selectedTypeId }
                 val typeOptions = expenseTypes.map { it.typeName } + "Other (Enter New)"
 
                 ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = it }
+                    expanded = typeExpanded,
+                    onExpandedChange = { typeExpanded = it }
                 ) {
                     OutlinedTextField(
                         value = if (isCustomType) "Other (Enter New)" else selectedType?.typeName ?: "",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Expense Type") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
                     ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
+                        expanded = typeExpanded,
+                        onDismissRequest = { typeExpanded = false }
                     ) {
                         typeOptions.forEach { typeName ->
                             DropdownMenuItem(
@@ -924,11 +1181,14 @@ private fun AddExpenseDialog(
                                 onClick = {
                                     if (typeName == "Other (Enter New)") {
                                         isCustomType = true
+                                        selectedTypeId = 0
                                     } else {
                                         isCustomType = false
                                         selectedTypeId = expenseTypes.find { it.typeName == typeName }?.id ?: 0
                                     }
-                                    expanded = false
+                                    selectedSubtypeName = ""
+                                    isCustomSubtype = false
+                                    typeExpanded = false
                                 }
                             )
                         }
@@ -942,6 +1202,54 @@ private fun AddExpenseDialog(
                         label = { Text("Enter New Expense Type") },
                         modifier = Modifier.fillMaxWidth()
                     )
+                }
+
+                // Expense Subtype Dropdown (only show if not custom type or if custom type entered)
+                if (!isCustomType || customType.isNotEmpty()) {
+                    var subtypeExpanded by remember { mutableStateOf(false) }
+                    val subtypeOptions = filteredSubtypes.map { it.typeName } + "Other (Enter New)"
+
+                    ExposedDropdownMenuBox(
+                        expanded = subtypeExpanded,
+                        onExpandedChange = { subtypeExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = if (isCustomSubtype) "Other (Enter New)" else selectedSubtypeName,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Expense Subtype (Optional)") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = subtypeExpanded) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = subtypeExpanded,
+                            onDismissRequest = { subtypeExpanded = false }
+                        ) {
+                            subtypeOptions.forEach { subtypeName ->
+                                DropdownMenuItem(
+                                    text = { Text(subtypeName) },
+                                    onClick = {
+                                        if (subtypeName == "Other (Enter New)") {
+                                            isCustomSubtype = true
+                                        } else {
+                                            isCustomSubtype = false
+                                            selectedSubtypeName = subtypeName
+                                        }
+                                        subtypeExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    if (isCustomSubtype) {
+                        OutlinedTextField(
+                            value = customSubtype,
+                            onValueChange = { customSubtype = it },
+                            label = { Text("Enter New Expense Subtype") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -972,18 +1280,19 @@ private fun AddExpenseDialog(
         confirmButton = {
             Button(
                 onClick = {
+                    val amountValue = amount.toBigDecimalOrNull() ?: BigDecimal.ZERO
+                    val qtyValue = quantity.toDoubleOrNull() ?: 1.0
+                    val finalSubtype = if (isCustomSubtype) customSubtype else if (selectedSubtypeName.isNotEmpty()) selectedSubtypeName else null
+                    
                     if (isCustomType && customType.isNotEmpty()) {
-                        onAddNewType(customType)
-                        onDismiss() 
+                        onConfirm(0, customType, finalSubtype, amountValue, qtyValue, notes)
                     } else {
-                        val amountValue = amount.toBigDecimalOrNull() ?: BigDecimal.ZERO
-                        val qtyValue = quantity.toDoubleOrNull() ?: 1.0
-                        onConfirm(selectedTypeId, amountValue, qtyValue, notes)
+                        onConfirm(selectedTypeId, null, finalSubtype, amountValue, qtyValue, notes)
                     }
                 },
-                enabled = (isCustomType && customType.isNotEmpty()) || (!isCustomType && selectedTypeId != 0 && amount.isNotEmpty())
+                enabled = ((isCustomType && customType.isNotEmpty()) || (!isCustomType && selectedTypeId != 0)) && amount.isNotEmpty()
             ) {
-                Text(if (isCustomType) "Add Type" else if (initialExpense == null) "Add" else "Update")
+                Text(if (initialExpense == null) "Add" else "Update")
             }
         },
         dismissButton = {
@@ -999,8 +1308,7 @@ private fun AddExpenseDialog(
 private fun AddIncomeDialog(
     incomeTypes: List<com.santhomach.estateexpense.data.model.IncomeType>,
     onDismiss: () -> Unit,
-    onConfirm: (Int, BigDecimal, Double, BigDecimal, BigDecimal, String) -> Unit,
-    onAddNewType: (String) -> Unit,
+    onConfirm: (Int, String?, BigDecimal, Double, BigDecimal, BigDecimal, String) -> Unit,
     initialIncome: com.santhomach.estateexpense.data.model.IncomeEntry? = null
 ) {
     var selectedTypeId by remember { mutableStateOf(initialIncome?.incomeTypeId ?: incomeTypes.firstOrNull()?.id ?: 0) }
@@ -1009,7 +1317,7 @@ private fun AddIncomeDialog(
     var transportCharge by remember { mutableStateOf(initialIncome?.transportationCharge?.toString() ?: "0") }
     var notes by remember { mutableStateOf(initialIncome?.notes ?: "") }
     var customType by remember { mutableStateOf("") }
-    var isCustomType by remember { mutableStateOf(initialIncome != null && incomeTypes.none { it.id == initialIncome.incomeTypeId }) }
+    var isCustomType by remember { mutableStateOf(false) }
 
     val calculatedAmount = remember(weight, pricePerKilo, transportCharge) {
         val w = weight.toDoubleOrNull() ?: 0.0
@@ -1120,11 +1428,19 @@ private fun AddIncomeDialog(
             Button(
                 onClick = {
                     if (isCustomType && customType.isNotEmpty()) {
-                        onAddNewType(customType)
-                        onDismiss()
+                        onConfirm(
+                            0,
+                            customType,
+                            calculatedAmount,
+                            weight.toDoubleOrNull() ?: 0.0,
+                            pricePerKilo.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+                            transportCharge.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+                            notes
+                        )
                     } else {
                         onConfirm(
                             selectedTypeId,
+                            null,
                             calculatedAmount,
                             weight.toDoubleOrNull() ?: 0.0,
                             pricePerKilo.toBigDecimalOrNull() ?: BigDecimal.ZERO,
@@ -1133,9 +1449,9 @@ private fun AddIncomeDialog(
                         )
                     }
                 },
-                enabled = (isCustomType && customType.isNotEmpty()) || (!isCustomType && selectedTypeId != 0 && weight.isNotEmpty() && pricePerKilo.isNotEmpty())
+                enabled = (isCustomType && customType.isNotEmpty() && weight.isNotEmpty() && pricePerKilo.isNotEmpty()) || (!isCustomType && selectedTypeId != 0 && weight.isNotEmpty() && pricePerKilo.isNotEmpty())
             ) {
-                Text(if (isCustomType) "Add Type" else if (initialIncome == null) "Add" else "Update")
+                Text(if (initialIncome == null) "Add" else "Update")
             }
         },
         dismissButton = {
