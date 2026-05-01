@@ -513,10 +513,31 @@ class DailyExpenseViewModel @Inject constructor(
                 _uiState.update { it.copy(isSaving = true, error = null) }
                 val expense = _currentExpense.value ?: throw IllegalStateException("No expense to save")
 
-                if (expense.id == 0) {
+                val id = if (expense.id == 0) {
                     repository.insertDailyExpense(expense)
                 } else {
                     repository.updateDailyExpense(expense)
+                    expense.id.toLong()
+                }
+
+                // Check and auto-create weekly funds if this is the first expense of the week
+                try {
+                    val expenseDate = LocalDate.parse(expense.date)
+                    val monday = expenseDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+                    val mondayStr = monday.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
+                    
+                    val allWeeklyFunds = repository.getAllWeeklyFundsFlow().first()
+                    if (allWeeklyFunds.none { it.weekStartDate == mondayStr }) {
+                        repository.insertWeeklyFunds(
+                            com.santhomach.estateexpense.data.model.WeeklyFunds(
+                                weekStartDate = mondayStr,
+                                amountReceived = BigDecimal.ZERO,
+                                notes = "Auto-created from first expense of the week"
+                            )
+                        )
+                    }
+                } catch (e: Exception) {
+                    // Log but don't fail saving expense if weekly funds creation fails
                 }
 
                 _uiState.update { it.copy(isSaving = false, isEditing = false) }

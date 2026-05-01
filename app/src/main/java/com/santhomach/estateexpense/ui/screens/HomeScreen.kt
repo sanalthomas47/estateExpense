@@ -275,7 +275,7 @@ fun HomeScreenContent(
                 }
             }
 
-            items(recentExpenses.take(5)) { expense ->
+            items(recentExpenses.take(12)) { expense ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { 

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -22,6 +23,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun WeeklyFundsScreen(
     onNavigateBack: () -> Unit = {},
+    onNavigateToReports: (LocalDate, LocalDate) -> Unit = { _, _ -> },
     viewModel: WeeklyFundsViewModel = hiltViewModel()
 ) {
     val weeklyFunds by viewModel.weeklyFunds.collectAsState()
@@ -89,7 +91,12 @@ fun WeeklyFundsScreen(
                         comparison?.let { comp ->
                             SummaryRow("Total Expenses", "₹${comp.totalExpenses}")
                             
-                            val netBalance = funds.paymentMade - comp.totalExpenses
+                            val netBalance = comp.totalPayments - comp.totalExpenses
+
+                            if (comp.totalPayments > BigDecimal.ZERO) {
+                                SummaryRow("Actual Payments Made", "₹${comp.totalPayments}")
+                            }
+
                             SummaryRow(
                                 label = if (netBalance >= BigDecimal.ZERO) "Excess Balance" else "Shortfall",
                                 value = "₹${netBalance.abs()}",
@@ -118,8 +125,16 @@ fun WeeklyFundsScreen(
                         // Action buttons for edit/delete
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                            horizontalArrangement = Arrangement.End
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            TextButton(onClick = {
+                                val monday = LocalDate.parse(funds.weekStartDate)
+                                val saturday = monday.plusDays(5)
+                                onNavigateToReports(monday, saturday)
+                            }) {
+                                Text("View Summary")
+                            }
                             TextButton(onClick = { 
                                 selectedFundsForEdit = funds
                                 showEditDialog = true 

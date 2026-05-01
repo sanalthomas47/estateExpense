@@ -25,16 +25,18 @@ class WeeklyFundsViewModel @Inject constructor(
     val weeklyFunds = repository.getAllWeeklyFundsFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Comparison for each week
+    // Comparison for each week (Monday to Saturday)
     fun getComparisonFlow(startDate: LocalDate): Flow<WeekComparison> {
-        val endDate = startDate.plusDays(6)
+        // Work week is Monday (startDate) to Saturday
+        val saturday = startDate.plusDays(5) 
         val startStr = startDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
-        val endStr = endDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
+        val endStr = saturday.format(DateTimeFormatter.ISO_LOCAL_DATE)
 
         return repository.getDailyExpenseSummaryFlow(startStr, endStr).map { summary ->
             WeekComparison(
                 totalExpenses = summary.totalLaborCost + summary.totalOvertimeCost + summary.totalOtherExpenses,
-                totalIncome = summary.totalIncome
+                totalIncome = summary.totalIncome,
+                totalPayments = summary.totalAdvanceAmount + summary.totalWeeklyPayment
             )
         }
     }
@@ -139,5 +141,6 @@ data class WeeklyFundsUiState(
 
 data class WeekComparison(
     val totalExpenses: BigDecimal = BigDecimal.ZERO,
-    val totalIncome: BigDecimal = BigDecimal.ZERO
+    val totalIncome: BigDecimal = BigDecimal.ZERO,
+    val totalPayments: BigDecimal = BigDecimal.ZERO
 )

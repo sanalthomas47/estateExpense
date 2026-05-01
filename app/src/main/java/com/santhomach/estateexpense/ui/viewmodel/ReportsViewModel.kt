@@ -7,12 +7,14 @@ import com.santhomach.estateexpense.data.repository.ExpenseRepository
 import com.santhomach.estateexpense.data.repository.ExpenseSummary
 import com.santhomach.estateexpense.data.repository.WeeklyExpenseSummary
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ReportsViewModel @Inject constructor(
     private val repository: ExpenseRepository
@@ -25,37 +27,31 @@ class ReportsViewModel @Inject constructor(
     val dateRange: StateFlow<DateRange> = _dateRange.asStateFlow()
 
     // Summary data flows
-    val dailySummary: StateFlow<ExpenseSummary> = combine(
-        _dateRange,
+    val dailySummary: StateFlow<ExpenseSummary> = _dateRange.flatMapLatest { range ->
         repository.getDailyExpenseSummaryFlow(
-            getStartDate(_dateRange.value).format(DateTimeFormatter.ISO_LOCAL_DATE),
-            getEndDate(_dateRange.value).format(DateTimeFormatter.ISO_LOCAL_DATE)
+            getStartDate(range).format(DateTimeFormatter.ISO_LOCAL_DATE),
+            getEndDate(range).format(DateTimeFormatter.ISO_LOCAL_DATE)
         )
-    ) { _, summary -> summary }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExpenseSummary())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExpenseSummary())
 
-    val weeklySummary: StateFlow<WeeklyExpenseSummary> = combine(
-        _dateRange,
+    val weeklySummary: StateFlow<WeeklyExpenseSummary> = _dateRange.flatMapLatest { range ->
         repository.getWeeklyExpenseSummaryFlow(
-            getStartDate(_dateRange.value).format(DateTimeFormatter.ISO_LOCAL_DATE),
-            getEndDate(_dateRange.value).format(DateTimeFormatter.ISO_LOCAL_DATE)
+            getStartDate(range).format(DateTimeFormatter.ISO_LOCAL_DATE),
+            getEndDate(range).format(DateTimeFormatter.ISO_LOCAL_DATE)
         )
-    ) { _, summary -> summary }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), WeeklyExpenseSummary())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), WeeklyExpenseSummary())
 
     // Recent expenses for detailed view
     val recentExpenses = repository.getRecentExpensesFlow(100)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Expenses filtered by current date range
-    val filteredExpenses = combine(
-        _dateRange,
+    val filteredExpenses = _dateRange.flatMapLatest { range ->
         repository.getDailyExpensesByDateRangeFlow(
-            getStartDate(_dateRange.value).format(DateTimeFormatter.ISO_LOCAL_DATE),
-            getEndDate(_dateRange.value).format(DateTimeFormatter.ISO_LOCAL_DATE)
+            getStartDate(range).format(DateTimeFormatter.ISO_LOCAL_DATE),
+            getEndDate(range).format(DateTimeFormatter.ISO_LOCAL_DATE)
         )
-    ) { _, expenses -> expenses }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun setDateRange(range: DateRange) {
         _dateRange.value = range

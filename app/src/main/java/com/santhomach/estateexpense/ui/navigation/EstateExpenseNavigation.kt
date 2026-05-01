@@ -15,7 +15,15 @@ import java.time.LocalDate
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
-    object Reports : Screen("reports")
+    object Reports : Screen("reports?startDate={startDate}&endDate={endDate}") {
+        fun createRoute(startDate: LocalDate? = null, endDate: LocalDate? = null): String {
+            return if (startDate != null && endDate != null) {
+                "reports?startDate=$startDate&endDate=$endDate"
+            } else {
+                "reports"
+            }
+        }
+    }
     object Settings : Screen("settings")
     object Payments : Screen("payments")
     object WeeklyFunds : Screen("weekly_funds")
@@ -54,8 +62,30 @@ fun EstateExpenseNavigation(
             )
         }
 
-        composable(Screen.Reports.route) {
+        composable(
+            route = Screen.Reports.route,
+            arguments = listOf(
+                navArgument("startDate") { 
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("endDate") { 
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val startDateStr = backStackEntry.arguments?.getString("startDate")
+            val endDateStr = backStackEntry.arguments?.getString("endDate")
+            
+            val startDate = startDateStr?.let { try { LocalDate.parse(it) } catch(e: Exception) { null } }
+            val endDate = endDateStr?.let { try { LocalDate.parse(it) } catch(e: Exception) { null } }
+
             ReportsScreen(
+                startDate = startDate,
+                endDate = endDate,
                 onNavigateBack = {
                     navController.popBackStack()
                 },
@@ -85,6 +115,9 @@ fun EstateExpenseNavigation(
             com.santhomach.estateexpense.ui.screens.WeeklyFundsScreen(
                 onNavigateBack = {
                     navController.popBackStack()
+                },
+                onNavigateToReports = { startDate: LocalDate, endDate: LocalDate ->
+                    navController.navigate(Screen.Reports.createRoute(startDate, endDate))
                 }
             )
         }

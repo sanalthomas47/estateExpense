@@ -26,6 +26,8 @@ import com.santhomach.estateexpense.ui.viewmodel.ReportsUiState
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsScreen(
+    startDate: LocalDate? = null,
+    endDate: LocalDate? = null,
     onNavigateBack: () -> Unit = {},
     onNavigateToExpenseEntry: (LocalDate, Int?) -> Unit = { _, _ -> },
     viewModelArg: ReportsViewModel? = null
@@ -38,6 +40,13 @@ fun ReportsScreen(
     }
 
     val viewModel: ReportsViewModel = viewModelArg ?: hiltViewModel()
+    
+    // Set initial date range if provided via navigation
+    LaunchedEffect(startDate, endDate) {
+        if (startDate != null && endDate != null) {
+            viewModel.setDateRange(DateRange.Custom(startDate, endDate))
+        }
+    }
     val uiState by viewModel.uiState.collectAsState()
     val dateRange by viewModel.dateRange.collectAsState()
     val dailySummary by viewModel.dailySummary.collectAsState()
@@ -197,10 +206,11 @@ fun ReportsScreen(
                         SummaryRow("Total Other Expenses", "₹${dailySummary.totalOtherExpenses}", icon = Icons.Default.ShoppingBag)
                         SummaryRow("Previous Excess Balance", "₹${dailySummary.totalExcessBalance}", icon = Icons.Default.AccountBalanceWallet)
                         
-                        val totalExp = dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses + dailySummary.totalAdvanceAmount + dailySummary.totalExcessBalance + dailySummary.totalWeeklyPayment
-                        
+                        val totalExp = dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses
+                        val totalOffset = (weeklySummary.totalLaborCost + weeklySummary.totalOvertimeCost + weeklySummary.totalOtherExpenses) - ( weeklySummary.totalAdvanceAmount + weeklySummary.totalWeeklyPayment + weeklySummary.totalExcessBalance)
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
                         SummaryRow("TOTAL EXPENSES", "₹$totalExp", isTotal = true)
+                        SummaryRow("TOTAL OFFSET (EXPENSES - PAYMENTS)", "₹$totalOffset", isTotal = true)
                         SummaryRow("TOTAL INCOME", "₹${dailySummary.totalIncome}", isTotal = true)
                         
                         Divider(modifier = Modifier.padding(vertical = 4.dp))
@@ -230,9 +240,10 @@ fun ReportsScreen(
                         SummaryRow("Previous Excess Balance", "₹${weeklySummary.totalExcessBalance}", icon = Icons.Default.AccountBalanceWallet)
                         
                         val totalExp = weeklySummary.totalLaborCost + weeklySummary.totalOvertimeCost + weeklySummary.totalOtherExpenses + weeklySummary.totalAdvanceAmount + weeklySummary.totalExcessBalance + weeklySummary.totalWeeklyPayment
-                        
+                        val totalOffset = (weeklySummary.totalLaborCost + weeklySummary.totalOvertimeCost + weeklySummary.totalOtherExpenses) - ( weeklySummary.totalAdvanceAmount + weeklySummary.totalWeeklyPayment + weeklySummary.totalExcessBalance)
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
                         SummaryRow("TOTAL EXPENSES", "₹$totalExp", isTotal = true)
+                        SummaryRow("TOTAL OFFSET (EXPENSES - PAYMENTS)", "₹$totalOffset", isTotal = true)
                         SummaryRow("TOTAL INCOME", "₹${weeklySummary.totalIncome}", isTotal = true)
                         
                         Divider(modifier = Modifier.padding(vertical = 4.dp))
