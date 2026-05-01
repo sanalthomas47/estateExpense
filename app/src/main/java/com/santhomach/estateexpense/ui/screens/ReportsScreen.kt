@@ -17,6 +17,8 @@ import com.santhomach.estateexpense.ui.viewmodel.ReportsViewModel
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.time.Instant
+import java.time.ZoneId
 
 import androidx.compose.ui.platform.LocalInspectionMode
 import com.santhomach.estateexpense.ui.viewmodel.ReportsUiState
@@ -43,6 +45,43 @@ fun ReportsScreen(
     val filteredExpenses by viewModel.filteredExpenses.collectAsState()
 
     var showDateRangePicker by remember { mutableStateOf(false) }
+
+    if (showDateRangePicker) {
+        val dateRangePickerState = rememberDateRangePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showDateRangePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val start = dateRangePickerState.selectedStartDateMillis?.let {
+                            Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+                        }
+                        val end = dateRangePickerState.selectedEndDateMillis?.let {
+                            Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+                        }
+                        if (start != null && end != null) {
+                            viewModel.setDateRange(DateRange.Custom(start, end))
+                            showDateRangePicker = false
+                        }
+                    },
+                    enabled = dateRangePickerState.selectedStartDateMillis != null && dateRangePickerState.selectedEndDateMillis != null
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDateRangePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DateRangePicker(
+                state = dateRangePickerState,
+                title = { Text("Select Date Range", modifier = Modifier.padding(16.dp)) },
+                modifier = Modifier.fillMaxWidth().height(500.dp)
+            )
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -101,7 +140,7 @@ fun ReportsScreen(
                             onExpandedChange = { expanded = it }
                         ) {
                             OutlinedTextField(
-                                value = when (dateRange) {
+                                value = when (val range = dateRange) {
                                     is DateRange.Last7Days -> "Last 7 Days"
                                     is DateRange.Last30Days -> "Last 30 Days"
                                     is DateRange.Last90Days -> "Last 90 Days"
@@ -109,7 +148,7 @@ fun ReportsScreen(
                                     is DateRange.ThisMonth -> "This Month"
                                     is DateRange.LastMonth -> "Last Month"
                                     is DateRange.ThisYear -> "This Year"
-                                    is DateRange.Custom -> "Custom Range"
+                                    is DateRange.Custom -> "${range.startDate.format(DateTimeFormatter.ofPattern("dd MMM"))} - ${range.endDate.format(DateTimeFormatter.ofPattern("dd MMM yyyy"))}"
                                 },
                                 onValueChange = {},
                                 readOnly = true,
@@ -125,7 +164,11 @@ fun ReportsScreen(
                                     DropdownMenuItem(
                                         text = { Text(label) },
                                         onClick = {
-                                            viewModel.setDateRange(range)
+                                            if (range is DateRange.Custom) {
+                                                showDateRangePicker = true
+                                            } else {
+                                                viewModel.setDateRange(range)
+                                            }
                                             expanded = false
                                         }
                                     )

@@ -7,7 +7,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,7 +14,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.santhomach.estateexpense.data.model.OtherExpenseEntry
-import com.santhomach.estateexpense.data.model.IncomeEntry
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.santhomach.estateexpense.ui.viewmodel.DailyExpenseViewModel
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -845,98 +844,197 @@ private fun AddWorkerGroupDialog(
     onAddNewTask: (String) -> Unit,
     initialGroup: com.santhomach.estateexpense.data.model.WorkerGroupEntry? = null
 ) {
-    var selectedWorkerTypeId by remember { mutableStateOf(initialGroup?.workerTypeId ?: workerTypes.firstOrNull()?.id ?: 0) }
-    var count by remember { mutableStateOf(initialGroup?.count?.toString() ?: "1") }
-    var wage by remember { 
-        val defaultWage = initialGroup?.wagePerDay ?: workerTypes.find { it.id == selectedWorkerTypeId }?.dailyBasicWage ?: BigDecimal.ZERO
-        mutableStateOf(defaultWage.toString()) 
+    // Internal row state — kept private to this composable
+    data class RowState(
+        val id: Int = System.nanoTime().toInt(),
+        val workerTypeId: Int,
+        val count: String,
+        val wage: String,
+        val otHours: String,
+        val otWage: String
+    )
+
+    var rows by remember {
+        mutableStateOf(
+            if (initialGroup != null) listOf(
+                RowState(
+                    workerTypeId = initialGroup.workerTypeId,
+                    count = initialGroup.count.toString(),
+                    wage = initialGroup.wagePerDay.toString(),
+                    otHours = initialGroup.overtimeHours.toString(),
+                    otWage = initialGroup.overtimeWagePerHour.toString()
+                )
+            ) else listOf(
+                RowState(
+                    workerTypeId = workerTypes.firstOrNull()?.id ?: 0,
+                    count = "1",
+                    wage = workerTypes.firstOrNull()?.dailyBasicWage?.toString() ?: "0",
+                    otHours = "0",
+                    otWage = "0"
+                )
+            )
+        )
     }
-    var otHours by remember { mutableStateOf(initialGroup?.overtimeHours?.toString() ?: "0") }
-    var otWage by remember { mutableStateOf(initialGroup?.overtimeWagePerHour?.toString() ?: "0") }
-    var selectedTask by remember { 
-        val taskName = initialGroup?.taskPerformed ?: workTasks.firstOrNull()?.taskName ?: ""
-        mutableStateOf(taskName) 
+
+    var selectedTask by remember {
+        mutableStateOf(initialGroup?.taskPerformed ?: workTasks.firstOrNull()?.taskName ?: "")
     }
     var customTask by remember { mutableStateOf("") }
-    var isCustomTask by remember { mutableStateOf(initialGroup != null && workTasks.none { it.taskName == initialGroup.taskPerformed }) }
+    var isCustomTask by remember {
+        mutableStateOf(initialGroup != null && workTasks.none { it.taskName == initialGroup.taskPerformed })
+    }
     var comments by remember { mutableStateOf(initialGroup?.comments ?: "") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initialGroup == null) "Add Worker Group" else "Edit Worker Group") },
+        title = { Text(if (initialGroup == null) "Add Worker Groups" else "Edit Worker Group") },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Worker Type Dropdown
-                var workerExpanded by remember { mutableStateOf(false) }
-                val selectedWorkerType = workerTypes.find { it.id == selectedWorkerTypeId }
-
-                ExposedDropdownMenuBox(
-                    expanded = workerExpanded,
-                    onExpandedChange = { workerExpanded = it }
-                ) {
-                    OutlinedTextField(
-                        value = selectedWorkerType?.workerTypeName ?: "",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Worker Type") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = workerExpanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = workerExpanded,
-                        onDismissRequest = { workerExpanded = false }
+                // ── Worker rows ──────────────────────────────────────────
+                rows.forEachIndexed { index, row ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        workerTypes.forEach { type ->
-                            DropdownMenuItem(
-                                text = { Text(type.workerTypeName) },
-                                onClick = {
-                                    selectedWorkerTypeId = type.id
-                                    wage = type.dailyBasicWage.toString()
-                                    workerExpanded = false
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Worker Type + Delete button
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                var workerExpanded by remember { mutableStateOf(false) }
+                                val selectedWorkerType = workerTypes.find { it.id == row.workerTypeId }
+
+                                ExposedDropdownMenuBox(
+                                    expanded = workerExpanded,
+                                    onExpandedChange = { workerExpanded = it },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    OutlinedTextField(
+                                        value = selectedWorkerType?.workerTypeName ?: "",
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        label = { Text("Worker Type") },
+                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = workerExpanded) },
+                                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                                    )
+                                    ExposedDropdownMenu(
+                                        expanded = workerExpanded,
+                                        onDismissRequest = { workerExpanded = false }
+                                    ) {
+                                        workerTypes.forEach { type ->
+                                            DropdownMenuItem(
+                                                text = { Text(type.workerTypeName) },
+                                                onClick = {
+                                                    rows = rows.toMutableList().also {
+                                                        it[index] = row.copy(
+                                                            workerTypeId = type.id,
+                                                            wage = type.dailyBasicWage.toString()
+                                                        )
+                                                    }
+                                                    workerExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
                                 }
-                            )
+
+                                if (rows.size > 1) {
+                                    IconButton(onClick = {
+                                        rows = rows.toMutableList().also { it.removeAt(index) }
+                                    }) {
+                                        Icon(
+                                            Icons.Default.Delete,
+                                            contentDescription = "Remove row",
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Count + Daily Wage
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = row.count,
+                                    onValueChange = { v ->
+                                        if (v.all { it.isDigit() })
+                                            rows = rows.toMutableList().also { it[index] = row.copy(count = v) }
+                                    },
+                                    label = { Text("Count") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedTextField(
+                                    value = row.wage,
+                                    onValueChange = { v ->
+                                        rows = rows.toMutableList().also { it[index] = row.copy(wage = v) }
+                                    },
+                                    label = { Text("Daily Wage") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    modifier = Modifier.weight(1.5f)
+                                )
+                            }
+
+                            // OT Hours + OT Rate
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = row.otHours,
+                                    onValueChange = { v ->
+                                        if (v.all { it.isDigit() })
+                                            rows = rows.toMutableList().also { it[index] = row.copy(otHours = v) }
+                                    },
+                                    label = { Text("OT Hours") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedTextField(
+                                    value = row.otWage,
+                                    onValueChange = { v ->
+                                        rows = rows.toMutableList().also { it[index] = row.copy(otWage = v) }
+                                    },
+                                    label = { Text("OT Rate/hr") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    modifier = Modifier.weight(1.5f)
+                                )
+                            }
                         }
                     }
                 }
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = count,
-                        onValueChange = { if (it.all { char -> char.isDigit() }) count = it },
-                        label = { Text("Count") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = wage,
-                        onValueChange = { wage = it },
-                        label = { Text("Daily Wage") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1.5f)
-                    )
+                // ── Add row button ───────────────────────────────────────
+                OutlinedButton(
+                    onClick = {
+                        rows = rows + RowState(
+                            workerTypeId = workerTypes.firstOrNull()?.id ?: 0,
+                            count = "1",
+                            wage = workerTypes.firstOrNull()?.dailyBasicWage?.toString() ?: "0",
+                            otHours = "0",
+                            otWage = "0"
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Add Worker Type")
                 }
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = otHours,
-                        onValueChange = { if (it.all { char -> char.isDigit() }) otHours = it },
-                        label = { Text("OT Hours") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = otWage,
-                        onValueChange = { otWage = it },
-                        label = { Text("OT Rate/hr") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1.5f)
-                    )
-                }
+                HorizontalDivider()
 
-                // Task Selection
+                // ── Shared Task dropdown ─────────────────────────────────
                 var taskExpanded by remember { mutableStateOf(false) }
                 val taskOptions = workTasks.map { it.taskName } + "Other (Enter New)"
 
@@ -960,12 +1058,8 @@ private fun AddWorkerGroupDialog(
                             DropdownMenuItem(
                                 text = { Text(task) },
                                 onClick = {
-                                    if (task == "Other (Enter New)") {
-                                        isCustomTask = true
-                                    } else {
-                                        isCustomTask = false
-                                        selectedTask = task
-                                    }
+                                    isCustomTask = task == "Other (Enter New)"
+                                    if (!isCustomTask) selectedTask = task
                                     taskExpanded = false
                                 }
                             )
@@ -991,31 +1085,33 @@ private fun AddWorkerGroupDialog(
             }
         },
         confirmButton = {
+            val finalTask = if (isCustomTask) customTask else selectedTask
+            val isValid = ((isCustomTask && customTask.isNotEmpty()) || (!isCustomTask && selectedTask.isNotEmpty()))
+                    && rows.all { it.count.toIntOrNull() != null && it.wage.toBigDecimalOrNull() != null }
+
             Button(
                 onClick = {
-                    val finalTask = if (isCustomTask) customTask else selectedTask
-                    if (isCustomTask && customTask.isNotEmpty()) {
-                        onAddNewTask(customTask)
+                    if (isCustomTask && customTask.isNotEmpty()) onAddNewTask(customTask)
+                    // Call onConfirm once per row — signature unchanged
+                    rows.forEach { row ->
+                        onConfirm(
+                            row.workerTypeId,
+                            row.count.toIntOrNull() ?: 0,
+                            row.wage.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+                            row.otHours.toIntOrNull() ?: 0,
+                            row.otWage.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+                            finalTask,
+                            comments
+                        )
                     }
-                    onConfirm(
-                        selectedWorkerTypeId,
-                        count.toIntOrNull() ?: 0,
-                        wage.toBigDecimalOrNull() ?: BigDecimal.ZERO,
-                        otHours.toIntOrNull() ?: 0,
-                        otWage.toBigDecimalOrNull() ?: BigDecimal.ZERO,
-                        finalTask,
-                        comments
-                    )
                 },
-                enabled = (isCustomTask && customTask.isNotEmpty()) || (!isCustomTask && selectedTask.isNotEmpty())
+                enabled = isValid
             ) {
                 Text(if (initialGroup == null) "Add" else "Update")
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
+            OutlinedButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
 }

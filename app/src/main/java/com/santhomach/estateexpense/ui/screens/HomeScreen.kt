@@ -4,12 +4,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.santhomach.estateexpense.ui.viewmodel.ReportsViewModel
@@ -135,12 +138,12 @@ fun HomeScreenContent(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Insights, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.Insights, contentDescription = null, tint = Color.White,)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Today's Summary",
+                                text = "Estate Investment Summary",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                color = Color.White
                             )
                         }
 
@@ -153,14 +156,14 @@ fun HomeScreenContent(
                             StatItem(
                                 label = "Income",
                                 value = "₹${dailySummary.totalIncome}",
-                                color = MaterialTheme.colorScheme.primary,
-                                icon = Icons.Default.TrendingUp
+                                color = Color.White,
+                                icon = Icons.AutoMirrored.Filled.TrendingUp
                             )
                             StatItem(
                                 label = "Expenses",
                                 value = "₹${dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses + dailySummary.totalAdvanceAmount + dailySummary.totalExcessBalance + dailySummary.totalWeeklyPayment}",
                                 color = MaterialTheme.colorScheme.error,
-                                icon = Icons.Default.TrendingDown
+                                icon = Icons.AutoMirrored.Filled.TrendingDown
                             )
                         }
                     }
