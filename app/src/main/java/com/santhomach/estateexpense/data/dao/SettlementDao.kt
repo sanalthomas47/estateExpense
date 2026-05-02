@@ -3,6 +3,7 @@ package com.santhomach.estateexpense.data.dao
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.santhomach.estateexpense.data.model.WeeklySettlement
@@ -12,7 +13,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface WeeklySettlementDao {
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(settlement: WeeklySettlement): Long
 
     @Update
@@ -46,7 +47,7 @@ interface WeeklySettlementDao {
 @Dao
 interface ExcessBalanceDao {
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(balance: ExcessBalance): Long
 
     @Update

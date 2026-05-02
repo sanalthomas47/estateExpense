@@ -211,7 +211,7 @@ fun HomeScreenContent(
                             StatItem(
                                 label = "Expenses",
                                 value = "₹${dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses}",
-                                color = MaterialTheme.colorScheme.error,
+                                color = Color.White,
                                 icon = Icons.AutoMirrored.Filled.TrendingDown
                             )
 
@@ -350,7 +350,23 @@ fun HomeScreenContent(
                                 },
                                 style = MaterialTheme.typography.titleSmall
                             )
-                            Row {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                val hasReceipt = remember(expense.otherExpenses) {
+                                    try {
+                                        val other = kotlinx.serialization.json.Json.decodeFromString(ListSerializer(OtherExpenseEntry.serializer()), expense.otherExpenses)
+                                        other.any { it.receiptImagePath != null }
+                                    } catch (e: Exception) { false }
+                                }
+
+                                if (hasReceipt) {
+                                    Icon(
+                                        imageVector = Icons.Default.Attachment,
+                                        contentDescription = "Has attachment",
+                                        modifier = Modifier.size(16.dp).padding(end = 4.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+
                                 Text(
                                     text = "Exp: ₹${expense.totalLaborCost + expense.totalOvertimeCost + expense.totalOtherExpensesCost}",
                                     style = MaterialTheme.typography.titleSmall,
@@ -562,7 +578,12 @@ fun ExpenseDetailDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(entry.typeName, style = MaterialTheme.typography.bodyMedium)
+                                val titleText = if (entry.subtypeName != null) {
+                                    "${entry.typeName} (${entry.subtypeName})"
+                                } else {
+                                    entry.typeName
+                                }
+                                Text(text = titleText, style = MaterialTheme.typography.bodyMedium)
                                 if (entry.notes.isNotEmpty()) {
                                     Text(entry.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
                                 }

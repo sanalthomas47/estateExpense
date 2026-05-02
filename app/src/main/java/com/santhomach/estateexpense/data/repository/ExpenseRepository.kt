@@ -113,6 +113,10 @@ class ExpenseRepository @Inject constructor(
         return expenseSubtypeDao.getAllActive()
     }
 
+    suspend fun getExpenseSubtypeByName(name: String): ExpenseSubtype? {
+        return expenseSubtypeDao.getByName(name)
+    }
+
     fun getAllActiveExpenseSubtypesFlow(): Flow<List<ExpenseSubtype>> {
         return expenseSubtypeDao.getAllActiveFlow()
     }

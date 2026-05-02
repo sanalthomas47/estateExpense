@@ -223,9 +223,13 @@ class DailyExpenseViewModel @Inject constructor(
             }
 
             if(customSubtypeName != null){
-                val parentType = expenseTypes.value.find { it.id == finalTypeId }
-                    ?: ExpenseType(id = finalTypeId, typeName = finalTypeName)
-                repository.insertExpenseSubtype(ExpenseSubtype(typeName = customSubtypeName, parentTypeName = parentType))
+                val existing = repository.getExpenseSubtypeByName(customSubtypeName)
+                // Only insert if it doesn't exist OR if it exists but belongs to a different parent type
+                if (existing == null || existing.parentTypeName.id != finalTypeId) {
+                    val parentType = expenseTypes.value.find { it.id == finalTypeId }
+                        ?: ExpenseType(id = finalTypeId, typeName = finalTypeName)
+                    repository.insertExpenseSubtype(ExpenseSubtype(typeName = customSubtypeName, parentTypeName = parentType))
+                }
             }
 
             _currentExpense.update { expense ->
@@ -234,6 +238,7 @@ class DailyExpenseViewModel @Inject constructor(
                     val newEntry = OtherExpenseEntry(
                         expenseTypeId = finalTypeId,
                         typeName = finalTypeName,
+                        subtypeName = customSubtypeName,
                         amount = amount,
                         quantity = quantity,
                         notes = notes,
@@ -283,10 +288,13 @@ class DailyExpenseViewModel @Inject constructor(
                 finalTypeName = expenseTypes.value.find { type -> type.id == expenseTypeId }?.typeName ?: "Unknown"
             }
             if(customSubtypeName != null){
-                val parentType = expenseTypes.value.find { it.id == finalTypeId }
-                    ?: ExpenseType(id = finalTypeId, typeName = finalTypeName)
-                val subTypeId = repository.insertExpenseSubtype(ExpenseSubtype(typeName = customSubtypeName, parentTypeName = parentType)).toInt()
-                // You can choose to store subTypeId in OtherExpenseEntry if needed
+                val existing = repository.getExpenseSubtypeByName(customSubtypeName)
+                // Only insert if it doesn't exist OR if it exists but belongs to a different parent type
+                if (existing == null || existing.parentTypeName.id != finalTypeId) {
+                    val parentType = expenseTypes.value.find { it.id == finalTypeId }
+                        ?: ExpenseType(id = finalTypeId, typeName = finalTypeName)
+                    repository.insertExpenseSubtype(ExpenseSubtype(typeName = customSubtypeName, parentTypeName = parentType))
+                }
             }
 
             _currentExpense.update { expense ->
@@ -296,6 +304,7 @@ class DailyExpenseViewModel @Inject constructor(
                         val newEntry = OtherExpenseEntry(
                             expenseTypeId = finalTypeId,
                             typeName = finalTypeName,
+                            subtypeName = customSubtypeName,
                             amount = amount,
                             quantity = quantity,
                             notes = notes,

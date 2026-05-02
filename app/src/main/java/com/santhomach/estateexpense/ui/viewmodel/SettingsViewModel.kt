@@ -36,6 +36,9 @@ class SettingsViewModel @Inject constructor(
     val workTasks = repository.getAllActiveWorkTasksFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val expenseSubtypes = repository.getAllActiveExpenseSubtypesFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     fun addPermanentWorker(name: String, role: String, dailyWage: BigDecimal) {
         viewModelScope.launch {
             try {
@@ -131,6 +134,16 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun deleteExpenseSubtype(expenseSubtype: com.santhomach.estateexpense.data.model.ExpenseSubtype) {
+        viewModelScope.launch {
+            try {
+                repository.deleteExpenseSubtype(expenseSubtype)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
     fun addIncomeType(name: String) {
         viewModelScope.launch {
             try {
@@ -195,12 +208,12 @@ class SettingsViewModel @Inject constructor(
         try {
             _uiState.update { it.copy(isExporting = true, error = null) }
 
-            val exportedFile = exportManager.exportToFile()
+            val exportPath = exportManager.exportToFile()
 
             _uiState.update {
                 it.copy(
                     isExporting = false,
-                    exportMessage = "Data exported successfully to: ${exportedFile.absolutePath}"
+                    exportMessage = "Data exported successfully to: $exportPath"
                 )
             }
         } catch (e: Exception) {
@@ -208,6 +221,31 @@ class SettingsViewModel @Inject constructor(
                 it.copy(
                     isExporting = false,
                     error = "Export failed: ${e.message}"
+                )
+            }
+        }
+    }
+
+    suspend fun importData(uri: android.net.Uri, context: Context) {
+        try {
+            _uiState.update { it.copy(isExporting = true, error = null) }
+
+            val jsonString = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                ?: throw Exception("Could not read file")
+
+            exportManager.importFromJson(jsonString)
+
+            _uiState.update {
+                it.copy(
+                    isExporting = false,
+                    exportMessage = "Data imported successfully. Please restart the app if changes don't appear immediately."
+                )
+            }
+        } catch (e: Exception) {
+            _uiState.update {
+                it.copy(
+                    isExporting = false,
+                    error = "Import failed: ${e.message}"
                 )
             }
         }

@@ -3,6 +3,7 @@ package com.santhomach.estateexpense.data.dao
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.santhomach.estateexpense.data.model.ExpenseSubtype
@@ -15,7 +16,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ExpenseTypeDao {
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(expenseType: ExpenseType): Long
 
     @Update
@@ -43,7 +44,7 @@ interface ExpenseTypeDao {
 @Dao
 interface ExpenseSubtypeDao {
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(expenseSubtype: ExpenseSubtype): Long
 
     @Update
@@ -54,6 +55,9 @@ interface ExpenseSubtypeDao {
 
     @Query("SELECT * FROM expense_subtypes WHERE id = :id")
     suspend fun getById(id: Int): ExpenseSubtype?
+
+    @Query("SELECT * FROM expense_subtypes WHERE typeName = :name LIMIT 1")
+    suspend fun getByName(name: String): ExpenseSubtype?
 
     @Query("SELECT * FROM expense_subtypes WHERE isActive = 1 ORDER BY typeName")
     suspend fun getAllActive(): List<ExpenseSubtype>
@@ -71,7 +75,7 @@ interface ExpenseSubtypeDao {
 @Dao
 interface IncomeTypeDao {
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(incomeType: IncomeType): Long
 
     @Update
@@ -99,7 +103,7 @@ interface IncomeTypeDao {
 @Dao
 interface WorkerTypeDao {
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(workerType: WorkerType): Long
 
     @Update
@@ -124,7 +128,7 @@ interface WorkerTypeDao {
 @Dao
 interface PermanentWorkerDao {
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(worker: PermanentWorker): Long
 
     @Update
@@ -149,7 +153,7 @@ interface PermanentWorkerDao {
 @Dao
 interface WorkTaskDao {
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(task: com.santhomach.estateexpense.data.model.WorkTask): Long
 
     @Update

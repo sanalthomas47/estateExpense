@@ -243,6 +243,7 @@ data class WorkerGroupEntry(
 data class OtherExpenseEntry(
     val expenseTypeId: Int,
     val typeName: String,
+    val subtypeName: String? = null,
     @Serializable(with = BigDecimalSerializer::class)
     val amount: BigDecimal,
     val quantity: Double = 1.0,

@@ -1149,7 +1149,12 @@ private fun ExpenseItemRow(
         }
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = expense.typeName, style = MaterialTheme.typography.bodyMedium)
+            val titleText = if (expense.subtypeName != null) {
+                "${expense.typeName} (${expense.subtypeName})"
+            } else {
+                expense.typeName
+            }
+            Text(text = titleText, style = MaterialTheme.typography.bodyMedium)
             Text(
                 text = "Qty: ${expense.quantity}",
                 style = MaterialTheme.typography.bodySmall,
@@ -1245,8 +1250,8 @@ private fun AddExpenseDialog(
     initialExpense: OtherExpenseEntry? = null,
     onSaveImage: (android.net.Uri) -> String? = { null }
 ) {
-    var selectedTypeId by remember { mutableStateOf(initialExpense?.expenseTypeId ?: expenseTypes.firstOrNull()?.id ?: 0) }
-    var selectedSubtypeName by remember { mutableStateOf("") }
+    var selectedTypeId by remember { mutableIntStateOf(initialExpense?.expenseTypeId ?: expenseTypes.firstOrNull()?.id ?: 0) }
+    var selectedSubtypeName by remember { mutableStateOf(initialExpense?.subtypeName ?: "") }
     var amount by remember { mutableStateOf(initialExpense?.amount?.toString() ?: "") }
     var quantity by remember { mutableStateOf(initialExpense?.quantity?.toString() ?: "1") }
     var notes by remember { mutableStateOf(initialExpense?.notes ?: "") }
@@ -1255,6 +1260,19 @@ private fun AddExpenseDialog(
     var isCustomType by remember { mutableStateOf(false) }
     var isCustomSubtype by remember { mutableStateOf(false) }
     var receiptImagePath by remember { mutableStateOf(initialExpense?.receiptImagePath) }
+
+    LaunchedEffect(initialExpense, expenseSubtypes) {
+        if (initialExpense != null) {
+            selectedTypeId = initialExpense.expenseTypeId
+            selectedSubtypeName = initialExpense.subtypeName ?: ""
+            amount = initialExpense.amount.toString()
+            quantity = initialExpense.quantity.toString()
+            notes = initialExpense.notes
+            receiptImagePath = initialExpense.receiptImagePath
+            isCustomSubtype = initialExpense.subtypeName != null && 
+                expenseSubtypes.none { it.typeName == initialExpense.subtypeName && it.parentTypeName.id == initialExpense.expenseTypeId }
+        }
+    }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()

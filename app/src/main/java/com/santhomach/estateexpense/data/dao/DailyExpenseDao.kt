@@ -3,6 +3,7 @@ package com.santhomach.estateexpense.data.dao
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.santhomach.estateexpense.data.model.DailyExpense
@@ -11,7 +12,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface DailyExpenseDao {
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(expense: DailyExpense): Long
 
     @Update

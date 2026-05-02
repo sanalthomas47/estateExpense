@@ -14,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.santhomach.estateexpense.ui.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
@@ -37,9 +39,21 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsState()
+    
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        uri?.let {
+            scope.launch {
+                viewModel.importData(it, context)
+            }
+        }
+    }
+
     val workers by viewModel.permanentWorkers.collectAsState()
     val workerTypes by viewModel.workerTypes.collectAsState()
     val expenseTypes by viewModel.expenseTypes.collectAsState()
+    val expenseSubtypes by viewModel.expenseSubtypes.collectAsState()
     val incomeTypes by viewModel.incomeTypes.collectAsState()
     val workTasks by viewModel.workTasks.collectAsState()
 
@@ -124,6 +138,16 @@ fun SettingsScreen(
                 )
             }
 
+            // Expense Subtypes Section
+            item {
+                SettingsCategoryCard(
+                    title = "Expense Sub-categories",
+                    items = expenseSubtypes.map { "${it.typeName} (${it.parentTypeName.typeName})" },
+                    onAddClick = { /* We usually add these via the expense entry, but let's allow deletion here */ },
+                    onDeleteClick = { index -> viewModel.deleteExpenseSubtype(expenseSubtypes[index]) }
+                )
+            }
+
             // Income Types Section
             item {
                 SettingsCategoryCard(
@@ -169,10 +193,11 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         OutlinedButton(
-                            onClick = { /* TODO: Implement import */ },
-                            modifier = Modifier.fillMaxWidth()
+                            onClick = { importLauncher.launch("application/json") },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !uiState.isExporting
                         ) {
-                            Text("Import Data from JSON")
+                            Text(if (uiState.isExporting) "Importing..." else "Import Data from JSON")
                         }
                     }
                 }
