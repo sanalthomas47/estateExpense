@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowRight
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
@@ -31,6 +34,7 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit = {},
     onNavigateToPayments: () -> Unit = {},
     onNavigateToWeeklyFunds: () -> Unit = {},
+    onNavigateToSearch: () -> Unit = {},
     viewModel: ReportsViewModel? = null
 ) {
     if (LocalInspectionMode.current && viewModel == null) {
@@ -41,7 +45,8 @@ fun HomeScreen(
             onNavigateToReports = onNavigateToReports,
             onNavigateToSettings = onNavigateToSettings,
             onNavigateToPayments = onNavigateToPayments,
-            onNavigateToWeeklyFunds = onNavigateToWeeklyFunds
+            onNavigateToWeeklyFunds = onNavigateToWeeklyFunds,
+            onNavigateToSearch = onNavigateToSearch
         )
         return
     }
@@ -87,6 +92,7 @@ fun HomeScreen(
         onNavigateToSettings = onNavigateToSettings,
         onNavigateToPayments = onNavigateToPayments,
         onNavigateToWeeklyFunds = onNavigateToWeeklyFunds,
+        onNavigateToSearch = onNavigateToSearch,
         onShowDatePicker = { showDatePicker = true }
     )
 }
@@ -101,6 +107,7 @@ fun HomeScreenContent(
     onNavigateToSettings: () -> Unit,
     onNavigateToPayments: () -> Unit,
     onNavigateToWeeklyFunds: () -> Unit,
+    onNavigateToSearch: () -> Unit = {},
     onShowDatePicker: () -> Unit = {}
 ) {
     Scaffold(
@@ -109,6 +116,9 @@ fun HomeScreenContent(
             TopAppBar(
                 title = { Text("Estate Expense Tracker") },
                 actions = {
+                    IconButton(onClick = onNavigateToSearch) {
+                        Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary)
+                    }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.primary)
                     }
@@ -161,9 +171,16 @@ fun HomeScreenContent(
                             )
                             StatItem(
                                 label = "Expenses",
-                                value = "₹${dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses + dailySummary.totalAdvanceAmount + dailySummary.totalExcessBalance + dailySummary.totalWeeklyPayment}",
+                                value = "₹${dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses}",
                                 color = MaterialTheme.colorScheme.error,
                                 icon = Icons.AutoMirrored.Filled.TrendingDown
+                            )
+
+                            StatItem(
+                                label = if (dailySummary.totalExcessBalance >= BigDecimal.ZERO) "Excess Balance" else "Shortfall",
+                                value = "₹${dailySummary.totalExcessBalance}",
+                                color = Color.White,
+                                icon = Icons.AutoMirrored.Filled.ArrowForward
                             )
                         }
                     }

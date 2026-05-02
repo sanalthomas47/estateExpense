@@ -103,6 +103,10 @@ class WorkerPaymentViewModel @Inject constructor(
     fun clearMessages() {
         _uiState.update { it.copy(error = null, successMessage = null) }
     }
+
+    suspend fun getExistingPayment(workerId: Int, date: LocalDate): WorkerPayment? {
+        return repository.getPaymentByWorkerAndDate(workerId, date.format(DateTimeFormatter.ISO_LOCAL_DATE))
+    }
 }
 
 data class WorkerPaymentUiState(

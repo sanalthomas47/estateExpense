@@ -27,4 +27,7 @@ interface WorkerPaymentDao {
 
     @Query("SELECT * FROM worker_payments WHERE paymentDate BETWEEN :startDate AND :endDate ORDER BY paymentDate DESC")
     fun getPaymentsByDateRangeFlow(startDate: String, endDate: String): Flow<List<WorkerPayment>>
+
+    @Query("SELECT * FROM worker_payments WHERE workerId = :workerId AND paymentDate = :date LIMIT 1")
+    suspend fun getByWorkerAndDate(workerId: Int, date: String): WorkerPayment?
 }

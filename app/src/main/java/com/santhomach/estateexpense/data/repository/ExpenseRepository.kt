@@ -67,6 +67,10 @@ class ExpenseRepository @Inject constructor(
         return expenseDao.getBeforeDate(date)
     }
 
+    suspend fun searchDailyExpenses(query: String): List<DailyExpense> {
+        return expenseDao.searchExpenses(query)
+    }
+
     fun getRecentExpensesFlow(limit: Int = 50): Flow<List<DailyExpense>> {
         return expenseDao.getRecentFlow(limit)
     }
@@ -191,6 +195,10 @@ class ExpenseRepository @Inject constructor(
 
     fun getAllPaymentsFlow(): Flow<List<WorkerPayment>> {
         return paymentDao.getAllPaymentsFlow()
+    }
+
+    suspend fun getPaymentByWorkerAndDate(workerId: Int, date: String): WorkerPayment? {
+        return paymentDao.getByWorkerAndDate(workerId, date)
     }
 
     // Weekly Settlement Operations

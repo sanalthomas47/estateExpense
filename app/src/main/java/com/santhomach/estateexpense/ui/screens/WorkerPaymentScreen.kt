@@ -12,9 +12,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -168,10 +170,15 @@ fun WorkerPaymentScreen(
         RecordPaymentDialog(
             workers = workers,
             onDismiss = { showAddDialog = false },
-            onConfirm = { workerId, amount, date, type, notes ->
-                viewModel.recordPayment(workerId, amount, date, type, notes)
+            onConfirm = { workerId, amount, date, type, notes, existingId ->
+                if (existingId == 0) {
+                    viewModel.recordPayment(workerId, amount, date, type, notes)
+                } else {
+                    viewModel.updatePayment(existingId, workerId, amount, date, type, notes)
+                }
                 showAddDialog = false
-            }
+            },
+            onCheckExisting = { id, date -> viewModel.getExistingPayment(id, date) }
         )
     }
 
@@ -183,7 +190,7 @@ fun WorkerPaymentScreen(
                     showEditDialog = false
                     selectedPaymentForEdit = null
                 },
-                onConfirm = { workerId, amount, date, type, notes ->
+                onConfirm = { workerId, amount, date, type, notes, _ ->
                     viewModel.updatePayment(payment.id, workerId, amount, date, type, notes)
                     showEditDialog = false
                     selectedPaymentForEdit = null
@@ -192,7 +199,9 @@ fun WorkerPaymentScreen(
                 initialAmount = payment.amount.toString(),
                 initialDate = LocalDate.parse(payment.paymentDate),
                 initialType = payment.paymentType,
-                initialNotes = payment.notes
+                initialNotes = payment.notes,
+                initialId = payment.id,
+                onCheckExisting = { id, date -> viewModel.getExistingPayment(id, date) }
             )
         }
     }
@@ -238,24 +247,70 @@ fun WorkerPaymentScreen(
 fun RecordPaymentDialog(
     workers: List<PermanentWorker>,
     onDismiss: () -> Unit,
-    onConfirm: (Int, BigDecimal, LocalDate, String, String) -> Unit,
+    onConfirm: (Int, BigDecimal, LocalDate, String, String, Int) -> Unit, // Added ID for editing
     initialWorkerId: Int = 0,
     initialAmount: String = "",
     initialDate: LocalDate = LocalDate.now(),
     initialType: String = "MONTHLY",
-    initialNotes: String = ""
+    initialNotes: String = "",
+    initialId: Int = 0,
+    onCheckExisting: suspend (Int, LocalDate) -> WorkerPayment? = { _, _ -> null }
 ) {
-    var selectedWorkerId by remember { mutableStateOf(initialWorkerId) }
+    var paymentId by remember { mutableIntStateOf(initialId) }
+    var selectedWorkerId by remember { mutableIntStateOf(initialWorkerId) }
     var amount by remember { mutableStateOf(initialAmount) }
     var date by remember { mutableStateOf(initialDate) }
     var paymentType by remember { mutableStateOf(initialType) }
     var notes by remember { mutableStateOf(initialNotes) }
 
-    val paymentTypes = listOf("MONTHLY", "WEEKLY", "ADVANCE", "BONUS")
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    // Logic to check for existing payment when worker or date changes
+    LaunchedEffect(selectedWorkerId, date) {
+        if (selectedWorkerId > 0) {
+            val existing = onCheckExisting(selectedWorkerId, date)
+            if (existing != null && existing.id != paymentId) {
+                // Load existing record for editing instead of creating new
+                paymentId = existing.id
+                amount = existing.amount.toString()
+                paymentType = existing.paymentType
+                notes = existing.notes
+            } else if (existing == null && paymentId != 0 && initialId == 0) {
+                // If it was auto-loaded but then changed to a non-existent combo, reset (only if we started fresh)
+                paymentId = 0
+                amount = ""
+                notes = ""
+            }
+        }
+    }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let {
+                        date = java.time.Instant.ofEpochMilli(it)
+                            .atZone(java.time.ZoneId.systemDefault())
+                            .toLocalDate()
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Record Payment") },
+        title = { Text(if (paymentId == 0) "Record Payment" else "Edit Payment") },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -293,6 +348,20 @@ fun RecordPaymentDialog(
                     }
                 }
 
+                // Date Selection
+                OutlinedTextField(
+                    value = date.format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Payment Date") },
+                    trailingIcon = {
+                        IconButton(onClick = { showDatePicker = true }) {
+                            Icon(Icons.Default.CalendarMonth, contentDescription = "Select Date")
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
                 OutlinedTextField(
                     value = amount,
                     onValueChange = { amount = it },
@@ -319,6 +388,7 @@ fun RecordPaymentDialog(
                         expanded = typeExpanded,
                         onDismissRequest = { typeExpanded = false }
                     ) {
+                        val paymentTypes = listOf("MONTHLY", "WEEKLY", "ADVANCE", "BONUS")
                         paymentTypes.forEach { type ->
                             DropdownMenuItem(
                                 text = { Text(type) },
@@ -342,11 +412,11 @@ fun RecordPaymentDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    onConfirm(selectedWorkerId, amount.toBigDecimalOrNull() ?: BigDecimal.ZERO, date, paymentType, notes)
+                    onConfirm(selectedWorkerId, amount.toBigDecimalOrNull() ?: BigDecimal.ZERO, date, paymentType, notes, paymentId)
                 },
                 enabled = selectedWorkerId > 0 && amount.isNotEmpty()
             ) {
-                Text("Save")
+                Text(if (paymentId == 0) "Save" else "Update")
             }
         },
         dismissButton = {

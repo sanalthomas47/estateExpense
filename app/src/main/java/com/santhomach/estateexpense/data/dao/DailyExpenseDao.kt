@@ -52,4 +52,16 @@ interface DailyExpenseDao {
 
     @Query("SELECT * FROM daily_expenses WHERE date < :date ORDER BY date ASC")
     suspend fun getBeforeDate(date: String): List<DailyExpense>
+
+    @Query("""
+        SELECT * FROM daily_expenses 
+        WHERE comments LIKE '%' || :query || '%' 
+        OR advanceReason LIKE '%' || :query || '%'
+        OR otherExpenses LIKE '%' || :query || '%'
+        OR incomeEntries LIKE '%' || :query || '%'
+        OR workerGroups LIKE '%' || :query || '%'
+        OR advanceEntries LIKE '%' || :query || '%'
+        ORDER BY date DESC
+    """)
+    suspend fun searchExpenses(query: String): List<DailyExpense>
 }
