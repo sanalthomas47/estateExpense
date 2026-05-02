@@ -20,11 +20,23 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.santhomach.estateexpense.ui.viewmodel.ReportsViewModel
 import androidx.compose.ui.platform.LocalInspectionMode
-import com.santhomach.estateexpense.data.model.DailyExpense
+import com.santhomach.estateexpense.data.model.*
 import com.santhomach.estateexpense.data.repository.ExpenseSummary
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.serialization.builtins.ListSerializer
+import java.io.File
+import coil.compose.AsyncImage
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,6 +68,8 @@ fun HomeScreen(
     val dailySummary by actualViewModel.dailySummary.collectAsState()
 
     var showDatePicker by remember { mutableStateOf(false) }
+    var selectedExpenseForView by remember { mutableStateOf<DailyExpense?>(null) }
+    var selectedImagePathForPreview by remember { mutableStateOf<String?>(null) }
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState()
@@ -84,6 +98,29 @@ fun HomeScreen(
         }
     }
 
+    if (selectedExpenseForView != null) {
+        ExpenseDetailDialog(
+            expense = selectedExpenseForView!!,
+            onDismiss = { selectedExpenseForView = null },
+            onEdit = {
+                val expense = selectedExpenseForView!!
+                selectedExpenseForView = null
+                onNavigateToExpenseEntry(
+                    try { LocalDate.parse(expense.date) } catch(e: Exception) { LocalDate.now() },
+                    expense.id
+                )
+            },
+            onImageClick = { selectedImagePathForPreview = it }
+        )
+    }
+
+    if (selectedImagePathForPreview != null) {
+        ImagePreviewDialog(
+            imagePath = selectedImagePathForPreview!!,
+            onDismiss = { selectedImagePathForPreview = null }
+        )
+    }
+
     HomeScreenContent(
         recentExpenses = recentExpenses,
         dailySummary = dailySummary,
@@ -93,7 +130,8 @@ fun HomeScreen(
         onNavigateToPayments = onNavigateToPayments,
         onNavigateToWeeklyFunds = onNavigateToWeeklyFunds,
         onNavigateToSearch = onNavigateToSearch,
-        onShowDatePicker = { showDatePicker = true }
+        onShowDatePicker = { showDatePicker = true },
+        onViewExpense = { selectedExpenseForView = it }
     )
 }
 
@@ -108,7 +146,8 @@ fun HomeScreenContent(
     onNavigateToPayments: () -> Unit,
     onNavigateToWeeklyFunds: () -> Unit,
     onNavigateToSearch: () -> Unit = {},
-    onShowDatePicker: () -> Unit = {}
+    onShowDatePicker: () -> Unit = {},
+    onViewExpense: (DailyExpense) -> Unit = {}
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -295,12 +334,7 @@ fun HomeScreenContent(
             items(recentExpenses.take(12)) { expense ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    onClick = { 
-                        onNavigateToExpenseEntry(
-                            try { LocalDate.parse(expense.date) } catch(e: Exception) { LocalDate.now() },
-                            expense.id
-                        )
-                    }
+                    onClick = { onViewExpense(expense) }
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -318,9 +352,15 @@ fun HomeScreenContent(
                             )
                             Row {
                                 Text(
-                                    text = "Exp: ₹${expense.totalLaborCost + expense.totalOvertimeCost + expense.totalOtherExpensesCost + expense.advanceAmount + expense.excessBalance + expense.weeklyPaymentDone}",
+                                    text = "Exp: ₹${expense.totalLaborCost + expense.totalOvertimeCost + expense.totalOtherExpensesCost}",
                                     style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "Pay: ₹${expense.advanceAmount + expense.excessBalance + expense.weeklyPaymentDone}",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = Color.White
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
@@ -415,5 +455,249 @@ private fun StatItem(
             style = MaterialTheme.typography.titleMedium,
             color = color
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ExpenseDetailDialog(
+    expense: DailyExpense,
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit,
+    onImageClick: (String) -> Unit = {}
+) {
+    val workerGroups = remember(expense.workerGroups) {
+        try {
+            if (expense.workerGroups.isBlank() || expense.workerGroups == "[]") emptyList<WorkerGroupEntry>()
+            else kotlinx.serialization.json.Json.decodeFromString(ListSerializer(WorkerGroupEntry.serializer()), expense.workerGroups)
+        } catch (e: Exception) { emptyList() }
+    }
+    
+    val otherExpenses = remember(expense.otherExpenses) {
+        try {
+            if (expense.otherExpenses.isBlank() || expense.otherExpenses == "[]") emptyList<OtherExpenseEntry>()
+            else kotlinx.serialization.json.Json.decodeFromString(ListSerializer(OtherExpenseEntry.serializer()), expense.otherExpenses)
+        } catch (e: Exception) { emptyList() }
+    }
+
+    val incomeEntries = remember(expense.incomeEntries) {
+        try {
+            if (expense.incomeEntries.isBlank() || expense.incomeEntries == "[]") emptyList<IncomeEntry>()
+            else kotlinx.serialization.json.Json.decodeFromString(ListSerializer(IncomeEntry.serializer()), expense.incomeEntries)
+        } catch (e: Exception) { emptyList() }
+    }
+
+    val advanceEntries = remember(expense.advanceEntries) {
+        try {
+            if (expense.advanceEntries.isBlank() || expense.advanceEntries == "[]") emptyList<AdvanceEntry>()
+            else kotlinx.serialization.json.Json.decodeFromString(ListSerializer(AdvanceEntry.serializer()), expense.advanceEntries)
+        } catch (e: Exception) { emptyList() }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = try {
+                        LocalDate.parse(expense.date).format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
+                    } catch (e: Exception) { expense.date },
+                    style = MaterialTheme.typography.titleLarge
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close")
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Summary Stats
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        DetailRow("Total Labor", "₹${expense.totalLaborCost}")
+                        DetailRow("Total Overtime", "₹${expense.totalOvertimeCost}")
+                        DetailRow("Other Expenses", "₹${expense.totalOtherExpensesCost}")
+                        DetailRow("Advances Paid", "₹${expense.advanceAmount}")
+                        DetailRow("Weekly Settlement", "₹${expense.weeklyPaymentDone}")
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        DetailRow("TOTAL INCOME", "₹${expense.totalIncome}", isTotal = true, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+
+                // Labor Breakdown
+                if (workerGroups.isNotEmpty()) {
+                    SectionTitle("Labor Breakdown")
+                    workerGroups.forEach { group ->
+                        Column(modifier = Modifier.fillMaxWidth().padding(start = 8.dp)) {
+                            Text("${group.workerTypeName} (${group.count})", style = MaterialTheme.typography.bodyMedium)
+                            Text("Task: ${group.taskPerformed}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                            Text("Cost: ₹${group.calculateTotalGroupCost()}", style = MaterialTheme.typography.bodySmall)
+                            if (group.comments.isNotEmpty()) {
+                                Text(group.comments, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                            }
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        }
+                    }
+                }
+
+                // Other Expenses Breakdown
+                if (otherExpenses.isNotEmpty()) {
+                    SectionTitle("Other Expenses")
+                    otherExpenses.forEach { entry ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(start = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(entry.typeName, style = MaterialTheme.typography.bodyMedium)
+                                if (entry.notes.isNotEmpty()) {
+                                    Text(entry.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                                }
+                                Text("Qty: ${entry.quantity} | ₹${entry.amount}", style = MaterialTheme.typography.bodySmall)
+                            }
+                            
+                            if (entry.receiptImagePath != null) {
+                                AsyncImage(
+                                    model = File(entry.receiptImagePath),
+                                    contentDescription = "Receipt",
+                                    modifier = Modifier
+                                        .size(60.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .clickable { onImageClick(entry.receiptImagePath) },
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    }
+                }
+
+                // Income Breakdown
+                if (incomeEntries.isNotEmpty()) {
+                    SectionTitle("Income Details")
+                    incomeEntries.forEach { entry ->
+                        Column(modifier = Modifier.fillMaxWidth().padding(start = 8.dp)) {
+                            Text(entry.typeName, style = MaterialTheme.typography.bodyMedium)
+                            Text("${entry.weight} kg @ ₹${entry.pricePerKilo}/kg", style = MaterialTheme.typography.bodySmall)
+                            Text("Total: ₹${entry.amount}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        }
+                    }
+                }
+
+                // Advances
+                if (advanceEntries.isNotEmpty()) {
+                    SectionTitle("Advance Payments")
+                    advanceEntries.forEach { entry ->
+                        Column(modifier = Modifier.fillMaxWidth().padding(start = 8.dp)) {
+                            Text("Recipient: ${entry.recipientName}", style = MaterialTheme.typography.bodyMedium)
+                            Text("Amount: ₹${entry.amount}", style = MaterialTheme.typography.bodySmall)
+                            if (entry.reason.isNotEmpty()) {
+                                Text("Reason: ${entry.reason}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                            }
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        }
+                    }
+                }
+
+                if (expense.comments.isNotEmpty()) {
+                    SectionTitle("Daily Comments")
+                    Text(
+                        text = expense.comments,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onEdit) {
+                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Edit Details")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
+@Composable
+private fun SectionTitle(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(vertical = 4.dp)
+    )
+}
+
+@Composable
+private fun DetailRow(label: String, value: String, isTotal: Boolean = false, color: Color = Color.Unspecified) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            style = if (isTotal) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodySmall
+        )
+        Text(
+            text = value,
+            style = if (isTotal) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodySmall,
+            color = if (color != Color.Unspecified) color else if (isTotal) MaterialTheme.colorScheme.primary else Color.Unspecified
+        )
+    }
+}
+
+@Composable
+fun ImagePreviewDialog(
+    imagePath: String,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = File(imagePath),
+                contentDescription = "Full Size Receipt",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+            }
+        }
     }
 }

@@ -1,5 +1,7 @@
 package com.santhomach.estateexpense.ui.viewmodel
 
+import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.santhomach.estateexpense.data.model.*
@@ -7,7 +9,7 @@ import com.santhomach.estateexpense.data.repository.ExpenseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import java.io.File
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -16,7 +18,8 @@ import kotlinx.serialization.builtins.ListSerializer
 
 @HiltViewModel
 class DailyExpenseViewModel @Inject constructor(
-    private val repository: ExpenseRepository
+    private val repository: ExpenseRepository,
+    private val application: Application
 ) : ViewModel() {
 
     // UI State
@@ -206,7 +209,7 @@ class DailyExpenseViewModel @Inject constructor(
         }
     }
 
-    fun addOtherExpense(expenseTypeId: Int, amount: BigDecimal, quantity: Double = 1.0, notes: String = "", customTypeName: String? = null,customSubtypeName: String? = null) {
+    fun addOtherExpense(expenseTypeId: Int, amount: BigDecimal, quantity: Double = 1.0, notes: String = "", customTypeName: String? = null,customSubtypeName: String? = null, receiptImagePath: String? = null) {
         viewModelScope.launch {
             val finalTypeId: Int
             val finalTypeName: String
@@ -233,7 +236,8 @@ class DailyExpenseViewModel @Inject constructor(
                         typeName = finalTypeName,
                         amount = amount,
                         quantity = quantity,
-                        notes = notes
+                        notes = notes,
+                        receiptImagePath = receiptImagePath
                     )
                     val updatedExpenses = currentExpenses + newEntry
                     val totalAmount = updatedExpenses.sumOf { entry -> entry.amount }
@@ -266,7 +270,7 @@ class DailyExpenseViewModel @Inject constructor(
         recalculateTotals()
     }
 
-    fun updateOtherExpense(index: Int, expenseTypeId: Int, amount: BigDecimal, quantity: Double = 1.0, notes: String = "", customTypeName: String? = null,customSubtypeName: String? = null) {
+    fun updateOtherExpense(index: Int, expenseTypeId: Int, amount: BigDecimal, quantity: Double = 1.0, notes: String = "", customTypeName: String? = null,customSubtypeName: String? = null, receiptImagePath: String? = null) {
         viewModelScope.launch {
             val finalTypeId: Int
             val finalTypeName: String
@@ -294,7 +298,8 @@ class DailyExpenseViewModel @Inject constructor(
                             typeName = finalTypeName,
                             amount = amount,
                             quantity = quantity,
-                            notes = notes
+                            notes = notes,
+                            receiptImagePath = receiptImagePath ?: currentExpenses[index].receiptImagePath
                         )
                         currentExpenses[index] = newEntry
                         val totalAmount = currentExpenses.sumOf { entry -> entry.amount }
@@ -693,9 +698,29 @@ class DailyExpenseViewModel @Inject constructor(
     fun getNetAmount(): BigDecimal {
         val expenses = getTotalActualExpenses()
         val payments = getTotalPaymentsMade()
-        val previousExcess = previousExcessBalance.value
+        val previousExcess = previousExcessBalance.value ?: BigDecimal.ZERO
         // Offset logic: (Current Payments + Carry-over) - Actual Costs
         return (payments + previousExcess) - expenses
+    }
+
+    fun saveReceiptImage(uri: Uri): String? {
+        return try {
+            val inputStream = application.contentResolver.openInputStream(uri) ?: return null
+            val fileName = "receipt_${System.currentTimeMillis()}.jpg"
+            val file = File(application.filesDir, "receipts").apply {
+                if (!exists()) mkdirs()
+            }
+            val targetFile = File(file, fileName)
+
+            inputStream.use { input ->
+                targetFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            targetFile.absolutePath
+        } catch (e: Exception) {
+            null
+        }
     }
 }
 

@@ -247,7 +247,8 @@ data class OtherExpenseEntry(
     val amount: BigDecimal,
     val quantity: Double = 1.0,
     val notes: String = "",
-    val addedAt: String = LocalDateTime.now().toString()
+    val addedAt: String = LocalDateTime.now().toString(),
+    val receiptImagePath: String? = null
 )
 
 /**

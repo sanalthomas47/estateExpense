@@ -21,6 +21,14 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import java.io.File
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -611,16 +619,17 @@ fun DailyExpenseScreen(
                 showAddOtherExpenseDialog = false
                 editingOtherExpenseIndex = null
             },
-            onConfirm = { typeId, customName,customSubtype, amount, quantity, notes ->
+            onConfirm = { typeId, customName,customSubtype, amount, quantity, notes, imagePath ->
                 if (editingOtherExpenseIndex != null) {
-                    viewModel.updateOtherExpense(editingOtherExpenseIndex!!, typeId, amount, quantity, notes, customName,customSubtype)
+                    viewModel.updateOtherExpense(editingOtherExpenseIndex!!, typeId, amount, quantity, notes, customName,customSubtype, imagePath)
                 } else {
-                    viewModel.addOtherExpense(typeId, amount, quantity, notes, customName,customSubtype)
+                    viewModel.addOtherExpense(typeId, amount, quantity, notes, customName,customSubtype, imagePath)
                 }
                 showAddOtherExpenseDialog = false
                 editingOtherExpenseIndex = null
             },
-            initialExpense = initialExpense
+            initialExpense = initialExpense,
+            onSaveImage = { uri -> viewModel.saveReceiptImage(uri) }
         )
     }
 
@@ -1127,6 +1136,18 @@ private fun ExpenseItemRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (expense.receiptImagePath != null) {
+            AsyncImage(
+                model = File(expense.receiptImagePath),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                contentScale = ContentScale.Crop
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+        }
+
         Column(modifier = Modifier.weight(1f)) {
             Text(text = expense.typeName, style = MaterialTheme.typography.bodyMedium)
             Text(
@@ -1220,8 +1241,9 @@ private fun AddExpenseDialog(
     expenseTypes: List<com.santhomach.estateexpense.data.model.ExpenseType>,
     expenseSubtypes: List<com.santhomach.estateexpense.data.model.ExpenseSubtype>,
     onDismiss: () -> Unit,
-    onConfirm: (Int, String?, String?, BigDecimal, Double, String) -> Unit,
-    initialExpense: OtherExpenseEntry? = null
+    onConfirm: (Int, String?, String?, BigDecimal, Double, String, String?) -> Unit,
+    initialExpense: OtherExpenseEntry? = null,
+    onSaveImage: (android.net.Uri) -> String? = { null }
 ) {
     var selectedTypeId by remember { mutableStateOf(initialExpense?.expenseTypeId ?: expenseTypes.firstOrNull()?.id ?: 0) }
     var selectedSubtypeName by remember { mutableStateOf("") }
@@ -1232,6 +1254,15 @@ private fun AddExpenseDialog(
     var customSubtype by remember { mutableStateOf("") }
     var isCustomType by remember { mutableStateOf(false) }
     var isCustomSubtype by remember { mutableStateOf(false) }
+    var receiptImagePath by remember { mutableStateOf(initialExpense?.receiptImagePath) }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        uri?.let {
+            receiptImagePath = onSaveImage(it)
+        }
+    }
 
     val filteredSubtypes = remember(selectedTypeId, expenseSubtypes, expenseTypes) {
         val selectedType = expenseTypes.find { it.id == selectedTypeId }
@@ -1250,6 +1281,37 @@ private fun AddExpenseDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Receipt Image Section
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { imagePickerLauncher.launch("image/*") },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (receiptImagePath != null) {
+                        AsyncImage(
+                            model = File(receiptImagePath!!),
+                            contentDescription = "Receipt",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        IconButton(
+                            onClick = { receiptImagePath = null },
+                            modifier = Modifier.align(Alignment.TopEnd)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Remove Image", tint = MaterialTheme.colorScheme.error)
+                        }
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.AddAPhoto, contentDescription = null, modifier = Modifier.size(48.dp))
+                            Text("Add Receipt Image", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+
                 // Expense Type Dropdown
                 var typeExpanded by remember { mutableStateOf(false) }
                 val selectedType = expenseTypes.find { it.id == selectedTypeId }
@@ -1381,9 +1443,9 @@ private fun AddExpenseDialog(
                     val finalSubtype = if (isCustomSubtype) customSubtype else if (selectedSubtypeName.isNotEmpty()) selectedSubtypeName else null
                     
                     if (isCustomType && customType.isNotEmpty()) {
-                        onConfirm(0, customType, finalSubtype, amountValue, qtyValue, notes)
+                        onConfirm(0, customType, finalSubtype, amountValue, qtyValue, notes, receiptImagePath)
                     } else {
-                        onConfirm(selectedTypeId, null, finalSubtype, amountValue, qtyValue, notes)
+                        onConfirm(selectedTypeId, null, finalSubtype, amountValue, qtyValue, notes, receiptImagePath)
                     }
                 },
                 enabled = ((isCustomType && customType.isNotEmpty()) || (!isCustomType && selectedTypeId != 0)) && amount.isNotEmpty()
