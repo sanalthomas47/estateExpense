@@ -66,8 +66,8 @@
     <string name="pref_backup_schedule">Backup Schedule</string>
 
     <!-- Worker Types -->
-    <string name="worker_type_malayali_male">Malayalam Male</string>
+    <string name="worker_type_malayali_male">Malayali Male</string>
     <string name="worker_type_bengali_male">Bengali Male</string>
-    <string name="worker_type_malayali_female">Malayalam Female</string>
+    <string name="worker_type_malayali_female">Malayali Female</string>
     <string name="worker_type_bengali_female">Bengali Female</string>
 </resources>

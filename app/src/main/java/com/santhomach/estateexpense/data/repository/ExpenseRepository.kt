@@ -382,9 +382,9 @@ class ExpenseRepository @Inject constructor(
 
         // Initialize default worker types
         val defaultWorkerTypes = listOf(
-            WorkerType(workerTypeName = "Malayalam Male", dailyBasicWage = BigDecimal("500")),
+            WorkerType(workerTypeName = "Malayali Male", dailyBasicWage = BigDecimal("500")),
             WorkerType(workerTypeName = "Bengali Male", dailyBasicWage = BigDecimal("500")),
-            WorkerType(workerTypeName = "Malayalam Female", dailyBasicWage = BigDecimal("450")),
+            WorkerType(workerTypeName = "Malayali Female", dailyBasicWage = BigDecimal("450")),
             WorkerType(workerTypeName = "Bengali Female", dailyBasicWage = BigDecimal("450"))
         )
 

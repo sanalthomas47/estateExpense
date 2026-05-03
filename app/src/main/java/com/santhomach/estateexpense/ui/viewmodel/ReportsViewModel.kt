@@ -41,6 +41,21 @@ class ReportsViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), WeeklyExpenseSummary())
 
+    val yearSummary: StateFlow<ExpenseSummary> = repository.getDailyExpenseSummaryFlow(
+        LocalDate.now().withDayOfYear(1).format(DateTimeFormatter.ISO_LOCAL_DATE),
+        LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+    ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExpenseSummary())
+
+    val allTimeSummary: StateFlow<ExpenseSummary> = repository.getDailyExpenseSummaryFlow(
+        "1900-01-01",
+        "2100-12-31"
+    ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExpenseSummary())
+
+    val weekSummary: StateFlow<ExpenseSummary> = repository.getDailyExpenseSummaryFlow(
+        LocalDate.now().with(java.time.DayOfWeek.MONDAY).format(DateTimeFormatter.ISO_LOCAL_DATE),
+        LocalDate.now().with(java.time.DayOfWeek.SATURDAY).format(DateTimeFormatter.ISO_LOCAL_DATE)
+    ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExpenseSummary())
+
     // Recent expenses for detailed view
     val recentExpenses = repository.getRecentExpensesFlow(100)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

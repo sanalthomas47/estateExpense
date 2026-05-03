@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.santhomach.estateexpense.ui.viewmodel.ReportsViewModel
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -53,6 +54,9 @@ fun HomeScreen(
         HomeScreenContent(
             recentExpenses = emptyList(),
             dailySummary = ExpenseSummary(),
+            weekSummary = ExpenseSummary(),
+            yearSummary = ExpenseSummary(),
+            allTimeSummary = ExpenseSummary(),
             onNavigateToExpenseEntry = onNavigateToExpenseEntry,
             onNavigateToReports = onNavigateToReports,
             onNavigateToSettings = onNavigateToSettings,
@@ -66,6 +70,9 @@ fun HomeScreen(
     val actualViewModel: ReportsViewModel = viewModel ?: hiltViewModel()
     val recentExpenses by actualViewModel.recentExpenses.collectAsState()
     val dailySummary by actualViewModel.dailySummary.collectAsState()
+    val weekSummary by actualViewModel.weekSummary.collectAsState()
+    val yearSummary by actualViewModel.yearSummary.collectAsState()
+    val allTimeSummary by actualViewModel.allTimeSummary.collectAsState()
 
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedExpenseForView by remember { mutableStateOf<DailyExpense?>(null) }
@@ -124,6 +131,9 @@ fun HomeScreen(
     HomeScreenContent(
         recentExpenses = recentExpenses,
         dailySummary = dailySummary,
+        weekSummary = weekSummary,
+        yearSummary = yearSummary,
+        allTimeSummary = allTimeSummary,
         onNavigateToExpenseEntry = onNavigateToExpenseEntry,
         onNavigateToReports = onNavigateToReports,
         onNavigateToSettings = onNavigateToSettings,
@@ -140,6 +150,9 @@ fun HomeScreen(
 fun HomeScreenContent(
     recentExpenses: List<DailyExpense>,
     dailySummary: ExpenseSummary,
+    weekSummary: ExpenseSummary,
+    yearSummary: ExpenseSummary,
+    allTimeSummary: ExpenseSummary,
     onNavigateToExpenseEntry: (LocalDate, Int?) -> Unit,
     onNavigateToReports: () -> Unit,
     onNavigateToSettings: () -> Unit,
@@ -153,7 +166,7 @@ fun HomeScreenContent(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Estate Expense Tracker") },
+                title = { Text("ESTATE LEDGER") },
                 actions = {
                     IconButton(onClick = onNavigateToSearch) {
                         Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary)
@@ -187,10 +200,10 @@ fun HomeScreenContent(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Insights, contentDescription = null, tint = Color.White,)
+                            Icon(Icons.Default.Insights, contentDescription = null, tint = Color.White)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Estate Investment Summary",
+                                text = "Estate Ledger Summary",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = Color.White
                             )
@@ -198,28 +211,34 @@ fun HomeScreenContent(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            StatItem(
-                                label = "Income",
-                                value = "₹${dailySummary.totalIncome}",
-                                color = Color.White,
-                                icon = Icons.AutoMirrored.Filled.TrendingUp
-                            )
-                            StatItem(
-                                label = "Expenses",
-                                value = "₹${dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses}",
-                                color = Color.White,
-                                icon = Icons.AutoMirrored.Filled.TrendingDown
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            // Line 1: Current Week
+                            SummaryLine(
+                                title = "This Week",
+                                income = weekSummary.totalIncome,
+                                expense = weekSummary.totalLaborCost + weekSummary.totalOvertimeCost + weekSummary.totalOtherExpenses,
+                                balance = (weekSummary.totalAdvanceAmount + weekSummary.totalWeeklyPayment) - (weekSummary.totalLaborCost + weekSummary.totalOvertimeCost + weekSummary.totalOtherExpenses),
+                                showEfficiency = false
                             )
 
-                            StatItem(
-                                label = if (dailySummary.totalExcessBalance >= BigDecimal.ZERO) "Excess Balance" else "Shortfall",
-                                value = "₹${dailySummary.totalExcessBalance}",
-                                color = Color.White,
-                                icon = Icons.AutoMirrored.Filled.ArrowForward
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
+
+                            // Line 2: This Year
+                            SummaryLine(
+                                title = "This Year",
+                                income = yearSummary.totalIncome,
+                                expense = yearSummary.totalLaborCost + yearSummary.totalOvertimeCost + yearSummary.totalOtherExpenses,
+                                showEfficiency = true
+                            )
+
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
+
+                            // Line 3: All Time
+                            SummaryLine(
+                                title = "All Time",
+                                income = allTimeSummary.totalIncome,
+                                expense = allTimeSummary.totalLaborCost + allTimeSummary.totalOvertimeCost + allTimeSummary.totalOtherExpenses,
+                                showEfficiency = true
                             )
                         }
                     }
@@ -440,10 +459,92 @@ fun HomeScreenContent(
 }
 
 @Composable
+private fun SummaryLine(
+    title: String,
+    income: BigDecimal,
+    expense: BigDecimal,
+    balance: BigDecimal? = null,
+    showEfficiency: Boolean = false
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.width(70.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.8f)
+            )
+        }
+
+        Row(
+            modifier = Modifier.weight(2f),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            StatItem(label = "Income", value = "₹$income", color = Color.White)
+            StatItem(label = "Expense", value = "₹$expense", color = Color.White)
+            
+            if (balance != null) {
+                StatItem(
+                    label = if (balance >= BigDecimal.ZERO) "Excess" else "Short",
+                    value = "₹${balance.abs()}",
+                    color = if (balance >= BigDecimal.ZERO) Color.White else Color(0xFFFFCDD2)
+                )
+            }
+
+            if (showEfficiency) {
+                val ratio = if (expense > BigDecimal.ZERO) {
+                    (income.multiply(BigDecimal("100")).divide(expense, 1, java.math.RoundingMode.HALF_UP)).toDouble()
+                } else if (income > BigDecimal.ZERO) 100.0 else 0.0
+
+                val isPositive = income >= expense
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Efficiency: ${ratio.toInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White
+                    )
+                    Icon(
+                        imageVector = if (isPositive) Icons.AutoMirrored.Filled.TrendingUp else Icons.AutoMirrored.Filled.TrendingDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = if (isPositive) Color(0xFFB9F6CA) else Color(0xFFFFCDD2)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatItemMini(
+    label: String,
+    value: String,
+    color: Color
+) {
+    Column {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+            color = color.copy(alpha = 0.7f)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelSmall,
+            color = color
+        )
+    }
+}
+
+@Composable
 private fun StatItem(
     label: String,
     value: String,
-    color: androidx.compose.ui.graphics.Color,
+    color: Color,
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null
 ) {
     Column(
