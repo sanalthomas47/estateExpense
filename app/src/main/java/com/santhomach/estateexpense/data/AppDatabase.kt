@@ -41,7 +41,7 @@ import androidx.room.TypeConverters
         WorkerPayment::class,
         com.santhomach.estateexpense.data.model.WeeklyFunds::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 @TypeConverters(RoomConverters::class)
@@ -70,10 +70,17 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "estate_expense.db"
                 )
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_8_9)
                     .build()
                 INSTANCE = instance
                 instance
+            }
+        }
+
+        private val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // Add the new column safely without deleting data
+                db.execSQL("ALTER TABLE daily_expenses ADD COLUMN extraOvertimeAmount TEXT NOT NULL DEFAULT '0'")
             }
         }
     }

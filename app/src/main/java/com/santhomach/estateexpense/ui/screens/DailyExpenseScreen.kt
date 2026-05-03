@@ -21,6 +21,12 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.layout.ContentScale
@@ -296,15 +302,15 @@ fun DailyExpenseScreen(
                     }
 
                     OutlinedTextField(
-                        value = (currentExpense?.overtimeHours ?: 0).toString(),
-                        onValueChange = { viewModel.updateOvertime(it.toIntOrNull() ?: 0) },
-                        label = { Text("Total Overtime Hours") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        value = (currentExpense?.extraOvertimeAmount ?: BigDecimal.ZERO).toString(),
+                        onValueChange = { viewModel.updateExtraOvertimeAmount(it.toBigDecimalOrNull() ?: BigDecimal.ZERO) },
+                        label = { Text("Extra Overtime Amount (₹)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     Text(
-                        text = "Calculated Cost: ₹${currentExpense?.totalOvertimeCost ?: BigDecimal.ZERO}",
+                        text = "Total Overtime Cost (incl. Workers): ₹${currentExpense?.totalOvertimeCost ?: BigDecimal.ZERO}",
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 4.dp)
                     )
@@ -857,10 +863,11 @@ private fun AddWorkerGroupDialog(
     data class RowState(
         val id: Int = System.nanoTime().toInt(),
         val workerTypeId: Int,
-        val count: String,
+        val count: TextFieldValue,
         val wage: String,
         val otHours: String,
-        val otWage: String
+        val otWage: String,
+        val isOtExpanded: Boolean = false
     )
 
     var rows by remember {
@@ -868,18 +875,20 @@ private fun AddWorkerGroupDialog(
             if (initialGroup != null) listOf(
                 RowState(
                     workerTypeId = initialGroup.workerTypeId,
-                    count = initialGroup.count.toString(),
+                    count = TextFieldValue(initialGroup.count.toString()),
                     wage = initialGroup.wagePerDay.toString(),
                     otHours = initialGroup.overtimeHours.toString(),
-                    otWage = initialGroup.overtimeWagePerHour.toString()
+                    otWage = initialGroup.overtimeWagePerHour.toString(),
+                    isOtExpanded = initialGroup.overtimeHours > 0
                 )
             ) else listOf(
                 RowState(
                     workerTypeId = workerTypes.firstOrNull()?.id ?: 0,
-                    count = "1",
+                    count = TextFieldValue("0"),
                     wage = workerTypes.firstOrNull()?.dailyBasicWage?.toString() ?: "0",
                     otHours = "0",
-                    otWage = "0"
+                    otWage = "0",
+                    isOtExpanded = false
                 )
             )
         )
@@ -902,6 +911,50 @@ private fun AddWorkerGroupDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // ── Shared Task dropdown (Now at the top) ─────────────────
+                var taskExpanded by remember { mutableStateOf(false) }
+                val taskOptions = workTasks.map { it.taskName } + "Other (Enter New)"
+
+                ExposedDropdownMenuBox(
+                    expanded = taskExpanded,
+                    onExpandedChange = { taskExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = if (isCustomTask) "Other (Enter New)" else selectedTask,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Work Performed") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = taskExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = taskExpanded,
+                        onDismissRequest = { taskExpanded = false }
+                    ) {
+                        taskOptions.forEach { task ->
+                            DropdownMenuItem(
+                                text = { Text(task) },
+                                onClick = {
+                                    isCustomTask = task == "Other (Enter New)"
+                                    if (!isCustomTask) selectedTask = task
+                                    taskExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                if (isCustomTask) {
+                    OutlinedTextField(
+                        value = customTask,
+                        onValueChange = { customTask = it },
+                        label = { Text("Enter New Task Name") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                HorizontalDivider()
+
                 // ── Worker rows ──────────────────────────────────────────
                 rows.forEachIndexed { index, row ->
                     Card(
@@ -976,12 +1029,25 @@ private fun AddWorkerGroupDialog(
                                 OutlinedTextField(
                                     value = row.count,
                                     onValueChange = { v ->
-                                        if (v.all { it.isDigit() })
+                                        if (v.text.all { it.isDigit() })
                                             rows = rows.toMutableList().also { it[index] = row.copy(count = v) }
                                     },
                                     label = { Text("Count") },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .onFocusChanged { focusState ->
+                                            if (focusState.isFocused) {
+                                                // Highlight all text on focus
+                                                rows = rows.toMutableList().also {
+                                                    it[index] = row.copy(
+                                                        count = row.count.copy(
+                                                            selection = TextRange(0, row.count.text.length)
+                                                        )
+                                                    )
+                                                }
+                                            }
+                                        }
                                 )
                                 OutlinedTextField(
                                     value = row.wage,
@@ -994,30 +1060,54 @@ private fun AddWorkerGroupDialog(
                                 )
                             }
 
-                            // OT Hours + OT Rate
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            // OT Toggle
+                            TextButton(
+                                onClick = {
+                                    rows = rows.toMutableList().also {
+                                        it[index] = row.copy(isOtExpanded = !row.isOtExpanded)
+                                    }
+                                },
+                                modifier = Modifier.align(Alignment.Start),
+                                contentPadding = PaddingValues(0.dp)
                             ) {
-                                OutlinedTextField(
-                                    value = row.otHours,
-                                    onValueChange = { v ->
-                                        if (v.all { it.isDigit() })
-                                            rows = rows.toMutableList().also { it[index] = row.copy(otHours = v) }
-                                    },
-                                    label = { Text("OT Hours") },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.weight(1f)
+                                Icon(
+                                    if (row.isOtExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = null
                                 )
-                                OutlinedTextField(
-                                    value = row.otWage,
-                                    onValueChange = { v ->
-                                        rows = rows.toMutableList().also { it[index] = row.copy(otWage = v) }
-                                    },
-                                    label = { Text("OT Rate/hr") },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                    modifier = Modifier.weight(1.5f)
-                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(if (row.isOtExpanded) "Hide OT Details" else "Show OT Details")
+                            }
+
+                            // Collapsible OT Hours + OT Rate
+                            AnimatedVisibility(
+                                visible = row.isOtExpanded,
+                                enter = expandVertically(),
+                                exit = shrinkVertically()
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value = row.otHours,
+                                        onValueChange = { v ->
+                                            if (v.all { it.isDigit() })
+                                                rows = rows.toMutableList().also { it[index] = row.copy(otHours = v) }
+                                        },
+                                        label = { Text("OT Hours") },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    OutlinedTextField(
+                                        value = row.otWage,
+                                        onValueChange = { v ->
+                                            rows = rows.toMutableList().also { it[index] = row.copy(otWage = v) }
+                                        },
+                                        label = { Text("OT Rate/hr") },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                        modifier = Modifier.weight(1.5f)
+                                    )
+                                }
                             }
                         }
                     }
@@ -1028,10 +1118,11 @@ private fun AddWorkerGroupDialog(
                     onClick = {
                         rows = rows + RowState(
                             workerTypeId = workerTypes.firstOrNull()?.id ?: 0,
-                            count = "1",
+                            count = TextFieldValue("0"),
                             wage = workerTypes.firstOrNull()?.dailyBasicWage?.toString() ?: "0",
                             otHours = "0",
-                            otWage = "0"
+                            otWage = "0",
+                            isOtExpanded = false
                         )
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -1039,50 +1130,6 @@ private fun AddWorkerGroupDialog(
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(Modifier.width(4.dp))
                     Text("Add Worker Type")
-                }
-
-                HorizontalDivider()
-
-                // ── Shared Task dropdown ─────────────────────────────────
-                var taskExpanded by remember { mutableStateOf(false) }
-                val taskOptions = workTasks.map { it.taskName } + "Other (Enter New)"
-
-                ExposedDropdownMenuBox(
-                    expanded = taskExpanded,
-                    onExpandedChange = { taskExpanded = it }
-                ) {
-                    OutlinedTextField(
-                        value = if (isCustomTask) "Other (Enter New)" else selectedTask,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Work Performed") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = taskExpanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = taskExpanded,
-                        onDismissRequest = { taskExpanded = false }
-                    ) {
-                        taskOptions.forEach { task ->
-                            DropdownMenuItem(
-                                text = { Text(task) },
-                                onClick = {
-                                    isCustomTask = task == "Other (Enter New)"
-                                    if (!isCustomTask) selectedTask = task
-                                    taskExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-
-                if (isCustomTask) {
-                    OutlinedTextField(
-                        value = customTask,
-                        onValueChange = { customTask = it },
-                        label = { Text("Enter New Task Name") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
                 }
 
                 OutlinedTextField(
@@ -1096,7 +1143,7 @@ private fun AddWorkerGroupDialog(
         confirmButton = {
             val finalTask = if (isCustomTask) customTask else selectedTask
             val isValid = ((isCustomTask && customTask.isNotEmpty()) || (!isCustomTask && selectedTask.isNotEmpty()))
-                    && rows.all { it.count.toIntOrNull() != null && it.wage.toBigDecimalOrNull() != null }
+                    && rows.all { it.count.text.toIntOrNull() != null && it.wage.toBigDecimalOrNull() != null }
 
             Button(
                 onClick = {
@@ -1105,7 +1152,7 @@ private fun AddWorkerGroupDialog(
                     rows.forEach { row ->
                         onConfirm(
                             row.workerTypeId,
-                            row.count.toIntOrNull() ?: 0,
+                            row.count.text.toIntOrNull() ?: 0,
                             row.wage.toBigDecimalOrNull() ?: BigDecimal.ZERO,
                             row.otHours.toIntOrNull() ?: 0,
                             row.otWage.toBigDecimalOrNull() ?: BigDecimal.ZERO,

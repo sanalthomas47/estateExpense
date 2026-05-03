@@ -239,7 +239,7 @@ fun ReportsScreen(
                         SummaryRow("Total Other Expenses", "₹${weeklySummary.totalOtherExpenses}", icon = Icons.Default.ShoppingBag)
                         SummaryRow("Previous Excess Balance", "₹${weeklySummary.totalExcessBalance}", icon = Icons.Default.AccountBalanceWallet)
                         
-                        val totalExp = weeklySummary.totalLaborCost + weeklySummary.totalOvertimeCost + weeklySummary.totalOtherExpenses + weeklySummary.totalAdvanceAmount + weeklySummary.totalExcessBalance + weeklySummary.totalWeeklyPayment
+                        val totalExp = weeklySummary.totalLaborCost + weeklySummary.totalOvertimeCost + weeklySummary.totalOtherExpenses
                         val totalOffset = (weeklySummary.totalLaborCost + weeklySummary.totalOvertimeCost + weeklySummary.totalOtherExpenses) - ( weeklySummary.totalAdvanceAmount + weeklySummary.totalWeeklyPayment + weeklySummary.totalExcessBalance)
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
                         SummaryRow("TOTAL EXPENSES", "₹$totalExp", isTotal = true)

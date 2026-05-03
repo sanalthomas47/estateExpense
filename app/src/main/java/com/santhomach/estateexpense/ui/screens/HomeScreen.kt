@@ -4,13 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.ArrowRight
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -192,129 +188,129 @@ fun HomeScreenContent(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-            // Quick Stats Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f))
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Insights, contentDescription = null, tint = Color.White)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Estate Ledger Summary",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Color.White
-                            )
-                        }
+                // Quick Stats Card
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Insights, contentDescription = null, tint = Color.White)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Estate Performance Summary",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = Color.White
+                                )
+                            }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            // Line 1: Current Week
-                            SummaryLine(
-                                title = "This Week",
-                                income = weekSummary.totalIncome,
-                                expense = weekSummary.totalLaborCost + weekSummary.totalOvertimeCost + weekSummary.totalOtherExpenses,
-                                balance = (weekSummary.totalAdvanceAmount + weekSummary.totalWeeklyPayment) - (weekSummary.totalLaborCost + weekSummary.totalOvertimeCost + weekSummary.totalOtherExpenses),
-                                showEfficiency = false
-                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                // Line 1: This Week
+                                SummaryLine(
+                                    title = "THIS WEEK",
+                                    income = weekSummary.totalIncome,
+                                    expense = weekSummary.totalLaborCost + weekSummary.totalOvertimeCost + weekSummary.totalOtherExpenses,
+                                    balance = (weekSummary.totalAdvanceAmount + weekSummary.totalWeeklyPayment) - (weekSummary.totalLaborCost + weekSummary.totalOvertimeCost + weekSummary.totalOtherExpenses),
+                                    showEfficiency = false
+                                )
 
-                            HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
 
-                            // Line 2: This Year
-                            SummaryLine(
-                                title = "This Year",
-                                income = yearSummary.totalIncome,
-                                expense = yearSummary.totalLaborCost + yearSummary.totalOvertimeCost + yearSummary.totalOtherExpenses,
-                                showEfficiency = true
-                            )
+                                // Line 2: This Year
+                                SummaryLine(
+                                    title = "THIS YEAR",
+                                    income = yearSummary.totalIncome,
+                                    expense = yearSummary.totalLaborCost + yearSummary.totalOvertimeCost + yearSummary.totalOtherExpenses,
+                                    showEfficiency = true
+                                )
 
-                            HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
 
-                            // Line 3: All Time
-                            SummaryLine(
-                                title = "All Time",
-                                income = allTimeSummary.totalIncome,
-                                expense = allTimeSummary.totalLaborCost + allTimeSummary.totalOvertimeCost + allTimeSummary.totalOtherExpenses,
-                                showEfficiency = true
-                            )
+                                // Line 3: ALL TIME
+                                SummaryLine(
+                                    title = "ALL TIME",
+                                    income = allTimeSummary.totalIncome,
+                                    expense = allTimeSummary.totalLaborCost + allTimeSummary.totalOvertimeCost + allTimeSummary.totalOtherExpenses,
+                                    showEfficiency = true
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            // Quick Actions
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Quick Actions",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
+                // Quick Actions
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Quick Actions",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = { onNavigateToExpenseEntry(LocalDate.now(), null) },
-                                modifier = Modifier.weight(1f)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Default.Today, contentDescription = null)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Add Today")
+                                OutlinedButton(
+                                    onClick = { onNavigateToExpenseEntry(LocalDate.now(), null) },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Today, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Add Today")
+                                }
+
+                                OutlinedButton(
+                                    onClick = onShowDatePicker,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.CalendarMonth, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Add for Date")
+                                }
                             }
 
-                            OutlinedButton(
-                                onClick = onShowDatePicker,
-                                modifier = Modifier.weight(1f)
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Default.CalendarMonth, contentDescription = null)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Add for Date")
-                            }
-                        }
+                                Button(
+                                    onClick = onNavigateToReports,
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(Icons.Default.BarChart, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Reports",
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = onNavigateToPayments,
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Payments",
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = onNavigateToReports,
-                                modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
-                            ) {
-                                Icon(Icons.Default.BarChart, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "Reports",
-                                    fontSize = MaterialTheme.typography.labelSmall.fontSize,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                            }
-
-                            Button(
-                                onClick = onNavigateToPayments,
-                                modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
-                            ) {
-                                Icon(Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "Payments",
-                                    fontSize = MaterialTheme.typography.labelSmall.fontSize,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                            }
-
-                            Button(
+                                Button(
                                 onClick = onNavigateToWeeklyFunds,
                                 modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
@@ -323,131 +319,132 @@ fun HomeScreenContent(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = "Weekly",
-                                    fontSize = MaterialTheme.typography.labelSmall.fontSize,
+                                    fontSize = 12.sp,
                                     maxLines = 1,
                                     softWrap = false
                                 )
                             }
+                            }
                         }
                     }
                 }
-            }
 
-            // Recent Expenses
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Recent Expenses",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    TextButton(onClick = onNavigateToReports) {
-                        Text("View All")
+                // Recent Expenses Header
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Recent Expenses",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        TextButton(onClick = onNavigateToReports) {
+                            Text("View All")
+                        }
                     }
                 }
-            }
 
-            items(recentExpenses.take(12)) { expense ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { onViewExpense(expense) }
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = try {
-                                    LocalDate.parse(expense.date).format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
-                                } catch (e: Exception) {
-                                    expense.date
-                                },
-                                style = MaterialTheme.typography.titleSmall
-                            )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                val hasReceipt = remember(expense.otherExpenses) {
-                                    try {
-                                        val other = kotlinx.serialization.json.Json.decodeFromString(ListSerializer(OtherExpenseEntry.serializer()), expense.otherExpenses)
-                                        other.any { it.receiptImagePath != null }
-                                    } catch (e: Exception) { false }
-                                }
+                items(recentExpenses.take(12)) { expense ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onViewExpense(expense) }
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = try {
+                                        LocalDate.parse(expense.date).format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
+                                    } catch (e: Exception) {
+                                        expense.date
+                                    },
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    val hasReceipt = remember(expense.otherExpenses) {
+                                        try {
+                                            val other = kotlinx.serialization.json.Json.decodeFromString(ListSerializer(OtherExpenseEntry.serializer()), expense.otherExpenses)
+                                            other.any { it.receiptImagePath != null }
+                                        } catch (e: Exception) { false }
+                                    }
 
-                                if (hasReceipt) {
-                                    Icon(
-                                        imageVector = Icons.Default.Attachment,
-                                        contentDescription = "Has attachment",
-                                        modifier = Modifier.size(16.dp).padding(end = 4.dp),
-                                        tint = MaterialTheme.colorScheme.primary
+                                    if (hasReceipt) {
+                                        Icon(
+                                            imageVector = Icons.Default.Attachment,
+                                            contentDescription = "Has attachment",
+                                            modifier = Modifier.size(16.dp).padding(end = 4.dp),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+
+                                    Text(
+                                        text = "Exp: ₹${expense.totalLaborCost + expense.totalOvertimeCost + expense.totalOtherExpensesCost}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = "Pay: ₹${expense.advanceAmount + expense.excessBalance + expense.weeklyPaymentDone}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = Color.Gray
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = "Inc: ₹${expense.totalIncome}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                 }
+                            }
 
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            // Worker summary
+                            val totalWorkers = expense.malayaliMaleCount + expense.bengaliMaleCount +
+                                              expense.malayaliFemaleCount + expense.bengaliFemaleCount
+                            if (totalWorkers > 0) {
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Exp: ₹${expense.totalLaborCost + expense.totalOvertimeCost + expense.totalOtherExpensesCost}",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.error
+                                    text = "Workers: $totalWorkers (${expense.malayaliMaleCount}M + ${expense.bengaliMaleCount}M + ${expense.malayaliFemaleCount}F + ${expense.bengaliFemaleCount}F)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Spacer(modifier = Modifier.width(12.dp))
+                            }
+
+                            if (expense.comments.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Pay: ₹${expense.advanceAmount + expense.excessBalance + expense.weeklyPaymentDone}",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = Color.White
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = "Inc: ₹${expense.totalIncome}",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.primary
+                                    text = expense.comments,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // Worker summary
-                        val totalWorkers = expense.malayaliMaleCount + expense.bengaliMaleCount +
-                                          expense.malayaliFemaleCount + expense.bengaliFemaleCount
-                        if (totalWorkers > 0) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Workers: $totalWorkers (${expense.malayaliMaleCount}M + ${expense.bengaliMaleCount}M + ${expense.malayaliFemaleCount}F + ${expense.bengaliFemaleCount}F)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        if (expense.comments.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = expense.comments,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                     }
                 }
-            }
 
-            // Show message if no data
-            if (recentExpenses.isEmpty()) {
-                item {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier.padding(32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "No expenses recorded yet",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(onClick = { onNavigateToExpenseEntry(LocalDate.now(), null) }) {
-                                Text("Add Your First Expense")
+                // Show message if no data
+                if (recentExpenses.isEmpty()) {
+                    item {
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(
+                                modifier = Modifier.padding(32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "No expenses recorded yet",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(onClick = { onNavigateToExpenseEntry(LocalDate.now(), null) }) {
+                                    Text("Add Your First Expense")
+                                }
                             }
                         }
                     }
@@ -455,7 +452,6 @@ fun HomeScreenContent(
             }
         }
     }
-}
 }
 
 @Composable
@@ -471,27 +467,27 @@ private fun SummaryLine(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.width(70.dp)) {
+        Column(modifier = Modifier.width(75.dp)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.8f)
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                color = Color.White
             )
         }
 
         Row(
-            modifier = Modifier.weight(2f),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            StatItem(label = "Income", value = "₹$income", color = Color.White)
-            StatItem(label = "Expense", value = "₹$expense", color = Color.White)
+            StatItemMini(label = "Income", value = "₹$income", color = Color.White)
+            StatItemMini(label = "Expense", value = "₹$expense", color = Color.White)
             
             if (balance != null) {
-                StatItem(
+                StatItemMini(
                     label = if (balance >= BigDecimal.ZERO) "Excess" else "Short",
                     value = "₹${balance.abs()}",
-                    color = if (balance >= BigDecimal.ZERO) Color.White else Color(0xFFFFCDD2)
+                    color = if (balance >= BigDecimal.ZERO) Color(0xFFB9F6CA) else Color(0xFFFFCDD2)
                 )
             }
 
@@ -502,9 +498,9 @@ private fun SummaryLine(
 
                 val isPositive = income >= expense
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "Efficiency: ${ratio.toInt()}%",
+                        text = "Eff: ${ratio.toInt()}%",
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White
                     )
@@ -529,12 +525,12 @@ private fun StatItemMini(
     Column {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-            color = color.copy(alpha = 0.7f)
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            color = color.copy(alpha = 0.8f)
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
             color = color
         )
     }

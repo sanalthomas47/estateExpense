@@ -122,6 +122,13 @@ class DailyExpenseViewModel @Inject constructor(
         recalculateTotals()
     }
 
+    fun updateExtraOvertimeAmount(amount: BigDecimal) {
+        _currentExpense.update { expense ->
+            expense?.copy(extraOvertimeAmount = amount)
+        }
+        recalculateTotals()
+    }
+
     fun addWorkerGroup(
         workerTypeId: Int,
         count: Int,
@@ -518,7 +525,7 @@ class DailyExpenseViewModel @Inject constructor(
 
         val legacyOvertime = legacyAverageRate * BigDecimal("1.5") * expense.overtimeHours.toBigDecimal()
 
-        return legacyOvertime + groupsOvertime
+        return legacyOvertime + groupsOvertime + expense.extraOvertimeAmount
     }
 
     fun saveExpense() {

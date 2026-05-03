@@ -155,6 +155,8 @@ data class DailyExpense(
     // Overtime
     val overtimeHours: Int = 0,
     @Serializable(with = BigDecimalSerializer::class)
+    val extraOvertimeAmount: BigDecimal = BigDecimal.ZERO,
+    @Serializable(with = BigDecimalSerializer::class)
     val totalOvertimeCost: BigDecimal = BigDecimal.ZERO,
 
     // Other expenses (can be multiple per day)
