@@ -100,7 +100,7 @@ fun SearchScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(searchResults) { expense ->
+                    items(searchResults, key = { it.id }) { expense ->
                         SearchExpenseItem(
                             expense = expense,
                             onClick = {

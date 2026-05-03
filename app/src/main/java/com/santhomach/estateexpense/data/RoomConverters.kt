@@ -11,6 +11,8 @@ class RoomConverters {
 
     @TypeConverter
     fun toBigDecimal(value: String?): BigDecimal? {
-        return value?.let { BigDecimal(it) }
+        return value?.let {
+            try { BigDecimal(it) } catch (e: NumberFormatException) { BigDecimal.ZERO }
+        }
     }
 }

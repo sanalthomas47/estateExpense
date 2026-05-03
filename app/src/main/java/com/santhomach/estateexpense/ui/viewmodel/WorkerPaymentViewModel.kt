@@ -67,8 +67,8 @@ class WorkerPaymentViewModel @Inject constructor(
                 _uiState.update { it.copy(isSaving = true) }
                 val existingPayment = allPayments.value.find { it.id == id }
                 val worker = permanentWorkers.value.find { it.id == workerId }
-                existingPayment?.let {
-                    val updatedPayment = it.copy(
+                if (existingPayment != null) {
+                    val updatedPayment = existingPayment.copy(
                         workerId = workerId,
                         workerName = worker?.name ?: "Unknown",
                         amount = amount,
@@ -78,6 +78,8 @@ class WorkerPaymentViewModel @Inject constructor(
                     )
                     repository.updateWorkerPayment(updatedPayment)
                     _uiState.update { it.copy(isSaving = false, successMessage = "Payment updated successfully") }
+                } else {
+                    _uiState.update { it.copy(isSaving = false, error = "Payment record not found") }
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSaving = false, error = e.message) }

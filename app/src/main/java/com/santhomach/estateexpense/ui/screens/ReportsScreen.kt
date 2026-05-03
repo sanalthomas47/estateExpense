@@ -402,7 +402,7 @@ fun ReportsScreen(
                 )
             }
 
-            items(filteredExpenses.take(20)) { expense ->
+            items(filteredExpenses.take(20), key = { it.id }) { expense ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { 

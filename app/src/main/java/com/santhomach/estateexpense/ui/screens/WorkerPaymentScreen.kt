@@ -82,7 +82,7 @@ fun WorkerPaymentScreen(
                 )
             }
 
-            itemsIndexed(payments) { index, payment ->
+            itemsIndexed(payments, key = { _, payment -> payment.id }) { index, payment ->
                 AnimatedVisibility(
                     visible = true,
                     enter = fadeIn(animationSpec = tween(300)) + slideInVertically(

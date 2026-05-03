@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,6 +45,7 @@ fun HomeScreen(
     onNavigateToPayments: () -> Unit = {},
     onNavigateToWeeklyFunds: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
+    onNavigateToExpenseTypeSummary: () -> Unit = {},
     viewModel: ReportsViewModel? = null
 ) {
     if (LocalInspectionMode.current && viewModel == null) {
@@ -58,7 +60,8 @@ fun HomeScreen(
             onNavigateToSettings = onNavigateToSettings,
             onNavigateToPayments = onNavigateToPayments,
             onNavigateToWeeklyFunds = onNavigateToWeeklyFunds,
-            onNavigateToSearch = onNavigateToSearch
+            onNavigateToSearch = onNavigateToSearch,
+            onNavigateToExpenseTypeSummary = onNavigateToExpenseTypeSummary
         )
         return
     }
@@ -136,6 +139,7 @@ fun HomeScreen(
         onNavigateToPayments = onNavigateToPayments,
         onNavigateToWeeklyFunds = onNavigateToWeeklyFunds,
         onNavigateToSearch = onNavigateToSearch,
+        onNavigateToExpenseTypeSummary = onNavigateToExpenseTypeSummary,
         onShowDatePicker = { showDatePicker = true },
         onViewExpense = { selectedExpenseForView = it }
     )
@@ -155,6 +159,7 @@ fun HomeScreenContent(
     onNavigateToPayments: () -> Unit,
     onNavigateToWeeklyFunds: () -> Unit,
     onNavigateToSearch: () -> Unit = {},
+    onNavigateToExpenseTypeSummary: () -> Unit = {},
     onShowDatePicker: () -> Unit = {},
     onViewExpense: (DailyExpense) -> Unit = {}
 ) {
@@ -325,6 +330,28 @@ fun HomeScreenContent(
                                 )
                             }
                             }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = onNavigateToExpenseTypeSummary,
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(Icons.Default.PieChart, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Expense Types",
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -346,7 +373,7 @@ fun HomeScreenContent(
                     }
                 }
 
-                items(recentExpenses.take(12)) { expense ->
+                items(recentExpenses.take(12), key = { it.id }) { expense ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { onViewExpense(expense) }

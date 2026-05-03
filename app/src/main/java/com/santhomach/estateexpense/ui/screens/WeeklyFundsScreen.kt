@@ -69,8 +69,12 @@ fun WeeklyFundsScreen(
                 )
             }
 
-            items(weeklyFunds) { funds ->
-                val startDate = LocalDate.parse(funds.weekStartDate)
+            items(weeklyFunds, key = { it.id }) { funds ->
+                val startDate = try {
+                    LocalDate.parse(funds.weekStartDate)
+                } catch (e: Exception) {
+                    LocalDate.now()
+                }
                 val comparison by viewModel.getComparisonFlow(startDate).collectAsState(initial = null)
 
                 Card(modifier = Modifier.fillMaxWidth()) {
