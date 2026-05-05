@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalInspectionMode
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit = {},
+    onNavigateToCsvImport: () -> Unit = {},
     viewModelArg: SettingsViewModel? = null
 ) {
     if (LocalInspectionMode.current && viewModelArg == null) {
@@ -198,6 +199,15 @@ fun SettingsScreen(
                             enabled = !uiState.isExporting
                         ) {
                             Text(if (uiState.isExporting) "Importing..." else "Import Data from JSON")
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Button(
+                            onClick = onNavigateToCsvImport,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Import from CSV (Bulk Backlog)")
                         }
                     }
                 }

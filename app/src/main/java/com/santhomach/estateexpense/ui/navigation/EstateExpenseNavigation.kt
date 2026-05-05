@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.santhomach.estateexpense.ui.screens.DailyExpenseScreen
+import com.santhomach.estateexpense.ui.screens.CsvImportScreen
 import com.santhomach.estateexpense.ui.screens.ExpenseTypeSummaryScreen
 import com.santhomach.estateexpense.ui.screens.HomeScreen
 import com.santhomach.estateexpense.ui.screens.ReportsScreen
@@ -30,6 +31,7 @@ sealed class Screen(val route: String) {
     object WeeklyFunds : Screen("weekly_funds")
     object Search : Screen("search")
     object ExpenseTypeSummary : Screen("expense_type_summary")
+    object CsvImport : Screen("csv_import")
     object DailyExpense : Screen("daily_expense/{date}?expenseId={expenseId}") {
         fun createRoute(date: LocalDate, expenseId: Int? = null): String {
             return "daily_expense/${date}?expenseId=${expenseId ?: 0}"
@@ -117,6 +119,17 @@ fun EstateExpenseNavigation(
 
         composable(Screen.Settings.route) {
             SettingsScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onNavigateToCsvImport = {
+                    navController.navigate(Screen.CsvImport.route)
+                }
+            )
+        }
+
+        composable(Screen.CsvImport.route) {
+            CsvImportScreen(
                 onNavigateBack = {
                     navController.popBackStack()
                 }

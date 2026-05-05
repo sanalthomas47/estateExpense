@@ -3,6 +3,7 @@ package com.santhomach.estateexpense.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.santhomach.estateexpense.data.model.DailyExpense
+import com.santhomach.estateexpense.data.model.OtherExpenseEntry
 import com.santhomach.estateexpense.data.repository.ExpenseRepository
 import com.santhomach.estateexpense.data.repository.ExpenseSummary
 import com.santhomach.estateexpense.data.repository.WeeklyExpenseSummary
@@ -10,7 +11,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
@@ -90,6 +95,55 @@ class ReportsViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Clone
+    // ---------------------------------------------------------------------------
+
+    fun cloneExpense(source: DailyExpense, targetDate: LocalDate) {
+        viewModelScope.launch {
+            try {
+                // Strip receipt paths — images belong to the original entry
+                val strippedExpenses = try {
+                    val entries = Json.decodeFromString(
+                        ListSerializer(OtherExpenseEntry.serializer()), source.otherExpenses
+                    ).map { it.copy(receiptImagePath = null) }
+                    Json.encodeToString(ListSerializer(OtherExpenseEntry.serializer()), entries)
+                } catch (_: Exception) { "[]" }
+
+                val cloned = source.copy(
+                    id = 0,
+                    date = targetDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                    otherExpenses = strippedExpenses,
+                    // Income, advances, settlements are day-specific — do not clone
+                    incomeEntries = "[]",
+                    totalIncome = java.math.BigDecimal.ZERO,
+                    advanceEntries = "[]",
+                    advanceAmount = java.math.BigDecimal.ZERO,
+                    advanceReason = "",
+                    weeklyPaymentDone = java.math.BigDecimal.ZERO,
+                    excessBalance = java.math.BigDecimal.ZERO,
+                    expenseAdditionType = "clone",
+                    createdAt = LocalDateTime.now().toString(),
+                    updatedAt = LocalDateTime.now().toString()
+                )
+                repository.insertDailyExpense(cloned)
+                _uiState.update { it.copy(cloneSuccessDate = targetDate) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Clone failed: ${e.message}") }
+            }
+        }
+    }
+
+    fun clearCloneSuccess() {
+        _uiState.update { it.copy(cloneSuccessDate = null) }
+    }
+
+    fun nextWorkday(from: LocalDate): LocalDate {
+        var next = from.plusDays(1)
+        if (next.dayOfWeek == DayOfWeek.SUNDAY) next = next.plusDays(1)
+        return next
     }
 
     // Helper functions for date calculations
@@ -217,7 +271,8 @@ class ReportsViewModel @Inject constructor(
 // UI State and Data Classes
 data class ReportsUiState(
     val isRefreshing: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val cloneSuccessDate: LocalDate? = null
 )
 
 sealed class DateRange {

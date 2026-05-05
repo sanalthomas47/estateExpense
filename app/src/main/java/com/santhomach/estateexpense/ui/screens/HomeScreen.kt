@@ -23,9 +23,12 @@ import com.santhomach.estateexpense.data.repository.ExpenseSummary
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import java.io.File
 import coil.compose.AsyncImage
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
@@ -72,10 +75,23 @@ fun HomeScreen(
     val weekSummary by actualViewModel.weekSummary.collectAsState()
     val yearSummary by actualViewModel.yearSummary.collectAsState()
     val allTimeSummary by actualViewModel.allTimeSummary.collectAsState()
+    val uiState by actualViewModel.uiState.collectAsState()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedExpenseForView by remember { mutableStateOf<DailyExpense?>(null) }
     var selectedImagePathForPreview by remember { mutableStateOf<String?>(null) }
+    var expenseToClone by remember { mutableStateOf<DailyExpense?>(null) }
+
+    // Show snackbar when clone succeeds
+    LaunchedEffect(uiState.cloneSuccessDate) {
+        val date = uiState.cloneSuccessDate ?: return@LaunchedEffect
+        val label = date.format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
+        snackbarHostState.showSnackbar("Cloned to $label")
+        actualViewModel.clearCloneSuccess()
+    }
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState()
@@ -127,12 +143,27 @@ fun HomeScreen(
         )
     }
 
+    if (expenseToClone != null) {
+        CloneExpenseDialog(
+            expense = expenseToClone!!,
+            nextWorkday = actualViewModel.nextWorkday(
+                try { LocalDate.parse(expenseToClone!!.date) } catch (_: Exception) { LocalDate.now() }
+            ),
+            onDismiss = { expenseToClone = null },
+            onClone = { targetDate ->
+                actualViewModel.cloneExpense(expenseToClone!!, targetDate)
+                expenseToClone = null
+            }
+        )
+    }
+
     HomeScreenContent(
         recentExpenses = recentExpenses,
         dailySummary = dailySummary,
         weekSummary = weekSummary,
         yearSummary = yearSummary,
         allTimeSummary = allTimeSummary,
+        snackbarHostState = snackbarHostState,
         onNavigateToExpenseEntry = onNavigateToExpenseEntry,
         onNavigateToReports = onNavigateToReports,
         onNavigateToSettings = onNavigateToSettings,
@@ -141,11 +172,12 @@ fun HomeScreen(
         onNavigateToSearch = onNavigateToSearch,
         onNavigateToExpenseTypeSummary = onNavigateToExpenseTypeSummary,
         onShowDatePicker = { showDatePicker = true },
-        onViewExpense = { selectedExpenseForView = it }
+        onViewExpense = { selectedExpenseForView = it },
+        onLongPressExpense = { expenseToClone = it }
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreenContent(
     recentExpenses: List<DailyExpense>,
@@ -153,6 +185,7 @@ fun HomeScreenContent(
     weekSummary: ExpenseSummary,
     yearSummary: ExpenseSummary,
     allTimeSummary: ExpenseSummary,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onNavigateToExpenseEntry: (LocalDate, Int?) -> Unit,
     onNavigateToReports: () -> Unit,
     onNavigateToSettings: () -> Unit,
@@ -161,10 +194,12 @@ fun HomeScreenContent(
     onNavigateToSearch: () -> Unit = {},
     onNavigateToExpenseTypeSummary: () -> Unit = {},
     onShowDatePicker: () -> Unit = {},
-    onViewExpense: (DailyExpense) -> Unit = {}
+    onViewExpense: (DailyExpense) -> Unit = {},
+    onLongPressExpense: (DailyExpense) -> Unit = {}
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("ESTATE LEDGER") },
@@ -375,8 +410,12 @@ fun HomeScreenContent(
 
                 items(recentExpenses.take(12), key = { it.id }) { expense ->
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { onViewExpense(expense) }
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .combinedClickable(
+                                onClick = { onViewExpense(expense) },
+                                onLongClick = { onLongPressExpense(expense) }
+                            )
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(
@@ -810,6 +849,83 @@ private fun DetailRow(label: String, value: String, isTotal: Boolean = false, co
             color = if (color != Color.Unspecified) color else if (isTotal) MaterialTheme.colorScheme.primary else Color.Unspecified
         )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CloneExpenseDialog(
+    expense: DailyExpense,
+    nextWorkday: LocalDate,
+    onDismiss: () -> Unit,
+    onClone: (LocalDate) -> Unit
+) {
+    val sourceLabel = try {
+        LocalDate.parse(expense.date).format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
+    } catch (_: Exception) { expense.date }
+
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = nextWorkday
+                .atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val chosen = java.time.Instant.ofEpochMilli(millis)
+                            .atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                        onClone(chosen)
+                    }
+                    showDatePicker = false
+                }) { Text("Clone") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+        return
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+        title = { Text("Clone Expense") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Copy all labor, other expenses, and comments from $sourceLabel to:",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    "Income, advances, and settlements are NOT copied.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onClone(nextWorkday) }) {
+                Icon(Icons.Default.FastForward, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(nextWorkday.format(DateTimeFormatter.ofPattern("EEE dd MMM")))
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { showDatePicker = true }) {
+                    Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Pick Date")
+                }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        }
+    )
 }
 
 @Composable
