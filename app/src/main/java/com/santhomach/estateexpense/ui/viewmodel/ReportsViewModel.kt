@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.santhomach.estateexpense.data.model.DailyExpense
 import com.santhomach.estateexpense.data.model.OtherExpenseEntry
+import com.santhomach.estateexpense.data.model.WorkerGroupEntry
 import com.santhomach.estateexpense.data.repository.ExpenseRepository
 import com.santhomach.estateexpense.data.repository.ExpenseSummary
 import com.santhomach.estateexpense.data.repository.WeeklyExpenseSummary
@@ -65,6 +66,12 @@ class ReportsViewModel @Inject constructor(
     val recentExpenses = repository.getRecentExpensesFlow(100)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // All expenses from the start of the current year
+    val yearlyExpenses: StateFlow<List<DailyExpense>> = repository.getDailyExpensesByDateRangeFlow(
+        LocalDate.now().withDayOfYear(1).format(DateTimeFormatter.ISO_LOCAL_DATE),
+        LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+    ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // Expenses filtered by current date range
     val filteredExpenses = _dateRange.flatMapLatest { range ->
         repository.getDailyExpensesByDateRangeFlow(
@@ -104,18 +111,24 @@ class ReportsViewModel @Inject constructor(
     fun cloneExpense(source: DailyExpense, targetDate: LocalDate) {
         viewModelScope.launch {
             try {
-                // Strip receipt paths — images belong to the original entry
-                val strippedExpenses = try {
-                    val entries = Json.decodeFromString(
-                        ListSerializer(OtherExpenseEntry.serializer()), source.otherExpenses
-                    ).map { it.copy(receiptImagePath = null) }
-                    Json.encodeToString(ListSerializer(OtherExpenseEntry.serializer()), entries)
-                } catch (_: Exception) { "[]" }
+                // Strip overtime from each worker group; recompute labor cost from base wages only
+                val strippedGroups = try {
+                    Json.decodeFromString(
+                        ListSerializer(WorkerGroupEntry.serializer()), source.workerGroups
+                    ).map { it.copy(overtimeHours = 0, overtimeWagePerHour = java.math.BigDecimal.ZERO) }
+                } catch (_: Exception) { emptyList() }
+                val strippedGroupsJson = Json.encodeToString(ListSerializer(WorkerGroupEntry.serializer()), strippedGroups)
+                val newLaborCost = strippedGroups.fold(java.math.BigDecimal.ZERO) { acc, g -> acc + g.calculateTotalGroupCost() }
 
                 val cloned = source.copy(
                     id = 0,
                     date = targetDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
-                    otherExpenses = strippedExpenses,
+                    workerGroups = strippedGroupsJson,
+                    totalLaborCost = newLaborCost,
+                    totalOvertimeCost = java.math.BigDecimal.ZERO,
+                    // Other expenses are day-specific — do not clone
+                    otherExpenses = "[]",
+                    totalOtherExpensesCost = java.math.BigDecimal.ZERO,
                     // Income, advances, settlements are day-specific — do not clone
                     incomeEntries = "[]",
                     totalIncome = java.math.BigDecimal.ZERO,

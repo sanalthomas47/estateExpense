@@ -1535,18 +1535,22 @@ private fun AddIncomeDialog(
     initialIncome: com.santhomach.estateexpense.data.model.IncomeEntry? = null
 ) {
     var selectedTypeId by remember { mutableStateOf(initialIncome?.incomeTypeId ?: incomeTypes.firstOrNull()?.id ?: 0) }
+    var amount by remember { mutableStateOf(initialIncome?.amount?.toString() ?: "") }
     var weight by remember { mutableStateOf(initialIncome?.weight?.toString() ?: "") }
-    var pricePerKilo by remember { mutableStateOf(initialIncome?.pricePerKilo?.toString() ?: "") }
     var transportCharge by remember { mutableStateOf(initialIncome?.transportationCharge?.toString() ?: "0") }
     var notes by remember { mutableStateOf(initialIncome?.notes ?: "") }
     var customType by remember { mutableStateOf("") }
     var isCustomType by remember { mutableStateOf(false) }
 
-    val calculatedAmount = remember(weight, pricePerKilo, transportCharge) {
-        val w = weight.toDoubleOrNull() ?: 0.0
-        val p = pricePerKilo.toBigDecimalOrNull() ?: BigDecimal.ZERO
+    val netAmount = remember(amount, transportCharge) {
+        val a = amount.toBigDecimalOrNull() ?: BigDecimal.ZERO
         val t = transportCharge.toBigDecimalOrNull() ?: BigDecimal.ZERO
-        (p * w.toBigDecimal()) - t
+        a - t
+    }
+    val derivedPricePerKilo = remember(amount, weight) {
+        val a = amount.toBigDecimalOrNull() ?: BigDecimal.ZERO
+        val w = weight.toDoubleOrNull() ?: 0.0
+        if (w > 0) a.divide(w.toBigDecimal(), 2, java.math.RoundingMode.HALF_UP) else BigDecimal.ZERO
     }
 
     AlertDialog(
@@ -1604,22 +1608,21 @@ private fun AddIncomeDialog(
                     )
                 }
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = weight,
-                        onValueChange = { weight = it },
-                        label = { Text("Weight (kg)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = pricePerKilo,
-                        onValueChange = { pricePerKilo = it },
-                        label = { Text("Price/kg") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    label = { Text("Amount (₹)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = weight,
+                    onValueChange = { weight = it },
+                    label = { Text("Weight (kg)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 OutlinedTextField(
                     value = transportCharge,
@@ -1635,8 +1638,8 @@ private fun AddIncomeDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Total Net Income:", style = MaterialTheme.typography.bodyMedium)
-                    Text("₹$calculatedAmount", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                    Text("Net Income:", style = MaterialTheme.typography.bodyMedium)
+                    Text("₹$netAmount", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                 }
 
                 OutlinedTextField(
@@ -1648,31 +1651,16 @@ private fun AddIncomeDialog(
             }
         },
         confirmButton = {
+            val transport = transportCharge.toBigDecimalOrNull() ?: BigDecimal.ZERO
             Button(
                 onClick = {
                     if (isCustomType && customType.isNotEmpty()) {
-                        onConfirm(
-                            0,
-                            customType,
-                            calculatedAmount,
-                            weight.toDoubleOrNull() ?: 0.0,
-                            pricePerKilo.toBigDecimalOrNull() ?: BigDecimal.ZERO,
-                            transportCharge.toBigDecimalOrNull() ?: BigDecimal.ZERO,
-                            notes
-                        )
+                        onConfirm(0, customType, netAmount, weight.toDoubleOrNull() ?: 0.0, derivedPricePerKilo, transport, notes)
                     } else {
-                        onConfirm(
-                            selectedTypeId,
-                            null,
-                            calculatedAmount,
-                            weight.toDoubleOrNull() ?: 0.0,
-                            pricePerKilo.toBigDecimalOrNull() ?: BigDecimal.ZERO,
-                            transportCharge.toBigDecimalOrNull() ?: BigDecimal.ZERO,
-                            notes
-                        )
+                        onConfirm(selectedTypeId, null, netAmount, weight.toDoubleOrNull() ?: 0.0, derivedPricePerKilo, transport, notes)
                     }
                 },
-                enabled = (isCustomType && customType.isNotEmpty() && weight.isNotEmpty() && pricePerKilo.isNotEmpty()) || (!isCustomType && selectedTypeId != 0 && weight.isNotEmpty() && pricePerKilo.isNotEmpty())
+                enabled = (isCustomType && customType.isNotEmpty() || !isCustomType && selectedTypeId != 0) && amount.isNotEmpty()
             ) {
                 Text(if (initialIncome == null) "Add" else "Update")
             }
