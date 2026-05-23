@@ -1,6 +1,9 @@
 package com.santhomach.estateexpense.di
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.preferencesDataStore
 import com.santhomach.estateexpense.data.AppDatabase
 import com.santhomach.estateexpense.data.export.ExportManager
 import com.santhomach.estateexpense.data.repository.ExpenseRepository
@@ -10,6 +13,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
+
+private val Context.appDataStore: DataStore<Preferences> by preferencesDataStore(name = "app_settings")
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -31,5 +36,11 @@ object DatabaseModule {
     @Singleton
     fun provideExportManager(@ApplicationContext context: Context): ExportManager {
         return ExportManager(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
+        return context.appDataStore
     }
 }

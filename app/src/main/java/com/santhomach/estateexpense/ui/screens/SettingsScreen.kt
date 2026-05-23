@@ -1,12 +1,16 @@
 package com.santhomach.estateexpense.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +21,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.santhomach.estateexpense.ui.viewmodel.SettingsViewModel
+import com.santhomach.estateexpense.ui.viewmodel.ThemeMode
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 
@@ -51,6 +56,7 @@ fun SettingsScreen(
         }
     }
 
+    val themeMode by viewModel.themeMode.collectAsState()
     val workers by viewModel.permanentWorkers.collectAsState()
     val workerTypes by viewModel.workerTypes.collectAsState()
     val expenseTypes by viewModel.expenseTypes.collectAsState()
@@ -158,6 +164,38 @@ fun SettingsScreen(
                     onEditClick = { index -> editingIncomeType = incomeTypes[index] },
                     onDeleteClick = { index -> viewModel.deleteIncomeType(incomeTypes[index]) }
                 )
+            }
+
+            // Appearance Section
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Appearance",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        Text(
+                            text = "App theme",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            ThemeMode.entries.forEachIndexed { index, mode ->
+                                SegmentedButton(
+                                    selected = themeMode == mode,
+                                    onClick = { viewModel.setThemeMode(mode) },
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = index,
+                                        count = ThemeMode.entries.size
+                                    ),
+                                    label = { Text(mode.label) }
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             // Data Management Section
@@ -372,53 +410,72 @@ fun SettingsCategoryCard(
     onEditClick: (Int) -> Unit = {},
     onDeleteClick: (Int) -> Unit = {}
 ) {
+    var isExpanded by remember { mutableStateOf(false) }
+
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Filled.KeyboardArrowDown
+                                      else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
                 IconButton(onClick = onAddClick) {
                     Icon(Icons.Filled.Add, contentDescription = "Add")
                 }
             }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            if (items.isEmpty()) {
-                Text(
-                    text = "None configured",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                items.forEachIndexed { index, item ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (items.isEmpty()) {
                         Text(
-                            text = item,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f)
+                            text = "None configured",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Row {
-                            TextButton(onClick = { onEditClick(index) }) {
-                                Text("Edit", fontSize = MaterialTheme.typography.labelSmall.fontSize)
-                            }
-                            TextButton(
-                                onClick = { onDeleteClick(index) },
-                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    } else {
+                        items.forEachIndexed { index, item ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Delete", fontSize = MaterialTheme.typography.labelSmall.fontSize)
+                                Text(
+                                    text = item,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Row {
+                                    TextButton(onClick = { onEditClick(index) }) {
+                                        Text("Edit", fontSize = MaterialTheme.typography.labelSmall.fontSize)
+                                    }
+                                    TextButton(
+                                        onClick = { onDeleteClick(index) },
+                                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                    ) {
+                                        Text("Delete", fontSize = MaterialTheme.typography.labelSmall.fontSize)
+                                    }
+                                }
                             }
                         }
                     }

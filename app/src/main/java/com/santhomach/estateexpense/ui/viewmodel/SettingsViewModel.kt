@@ -1,6 +1,10 @@
 package com.santhomach.estateexpense.ui.viewmodel
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.santhomach.estateexpense.data.export.ExportManager
@@ -15,11 +19,32 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val exportManager: ExportManager,
-    private val repository: ExpenseRepository
+    private val repository: ExpenseRepository,
+    private val dataStore: DataStore<Preferences>
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    val themeMode: StateFlow<ThemeMode> = dataStore.data
+        .map { prefs ->
+            when (prefs[THEME_KEY]) {
+                "LIGHT" -> ThemeMode.LIGHT
+                "DARK" -> ThemeMode.DARK
+                else -> ThemeMode.SYSTEM
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ThemeMode.SYSTEM)
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch {
+            dataStore.edit { it[THEME_KEY] = mode.name }
+        }
+    }
+
+    companion object {
+        private val THEME_KEY = stringPreferencesKey("theme_mode")
+    }
 
     val permanentWorkers = repository.getAllActivePermanentWorkersFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -261,3 +286,7 @@ data class SettingsUiState(
     val exportMessage: String? = null,
     val error: String? = null
 )
+
+enum class ThemeMode(val label: String) {
+    SYSTEM("System"), LIGHT("Light"), DARK("Dark")
+}

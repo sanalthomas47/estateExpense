@@ -754,7 +754,7 @@ private fun ExpenseListCard(
                         Icon(
                             imageVector = Icons.Default.Attachment,
                             contentDescription = "Has attachment",
-                            modifier = Modifier.size(15.dp),
+                            modifier = Modifier.size(22.dp),
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -821,16 +821,16 @@ private fun AmountChip(
     color: Color,
     bgColor: Color
 ) {
-    Column(
+    Row(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
             .background(bgColor)
             .padding(horizontal = 9.dp, vertical = 5.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
-            text = label,
+            text = "$label:",
             style = MaterialTheme.typography.labelSmall,
             fontSize = 10.sp,
             color = color.copy(alpha = 0.65f)
