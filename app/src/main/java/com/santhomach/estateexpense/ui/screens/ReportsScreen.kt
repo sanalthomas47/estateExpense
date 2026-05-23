@@ -135,6 +135,7 @@ fun ReportsScreen(
 
                         var expanded by remember { mutableStateOf(false) }
                         val rangeOptions = listOf(
+                            "Current Week" to DateRange.CurrentWeek,
                             "Last 7 Days" to DateRange.Last7Days,
                             "Last 30 Days" to DateRange.Last30Days,
                             "Last 90 Days" to DateRange.Last90Days,
@@ -150,6 +151,7 @@ fun ReportsScreen(
                         ) {
                             OutlinedTextField(
                                 value = when (val range = dateRange) {
+                                    is DateRange.CurrentWeek -> "Current Week"
                                     is DateRange.Last7Days -> "Last 7 Days"
                                     is DateRange.Last30Days -> "Last 30 Days"
                                     is DateRange.Last90Days -> "Last 90 Days"
@@ -250,6 +252,180 @@ fun ReportsScreen(
                         SummaryRow("Total Weeks", weeklySummary.totalWeeks.toString())
                         SummaryRow("Avg Weekly Income", "₹${weeklySummary.averageWeeklyIncome}")
                         SummaryRow("Avg Weekly Expense", "₹${weeklySummary.averageWeeklyExpense}")
+                    }
+                }
+            }
+
+            // Weekly Specifics
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "Weekly Specifics",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+
+                        val specificWorkers = viewModel.getWeeklySpecificWorkers(filteredExpenses)
+                        val specificOther = viewModel.getWeeklySpecificOtherExpenses(filteredExpenses)
+                        val specificSettlement = viewModel.getWeeklySpecificSettlement(filteredExpenses)
+                        val specificAdvances = viewModel.getWeeklySpecificAdvances(filteredExpenses)
+                        val hasOvertime = specificWorkers.any { it.totalOvertimeCost > BigDecimal.ZERO }
+
+                        if (specificWorkers.isEmpty() && specificOther.isEmpty() && specificSettlement == BigDecimal.ZERO && specificAdvances.isEmpty()) {
+                            Text("No data for this period", style = MaterialTheme.typography.bodyMedium)
+                        } else {
+                            // LABOR
+                            if (specificWorkers.isNotEmpty()) {
+                                Text(
+                                    "LABOR",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Type", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(2f))
+                                    Text("Days", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.6f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                    Text("Cost", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                }
+                                Divider()
+                                specificWorkers.forEach { row ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(row.workerTypeName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(2f))
+                                        Text(row.totalCount.toString(), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(0.6f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                        Text("₹${row.totalBaseCost}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                    }
+                                    Divider()
+                                }
+                            }
+
+                            // OTHER EXPENSES
+                            if (specificOther.isNotEmpty()) {
+                                Text(
+                                    "OTHER EXPENSES",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Item", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(2f))
+                                    Text("Qty", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.6f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                    Text("Amount", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                }
+                                Divider()
+                                specificOther.forEach { row ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        val label = if (row.subtypeName != null) "${row.typeName} (${row.subtypeName})" else row.typeName
+                                        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(2f))
+                                        Text(
+                                            if (row.totalQuantity == row.totalQuantity.toLong().toDouble()) row.totalQuantity.toLong().toString() else String.format("%.1f", row.totalQuantity),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            modifier = Modifier.weight(0.6f),
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.End
+                                        )
+                                        Text("₹${row.totalAmount}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                    }
+                                    Divider()
+                                }
+                            }
+
+                            // OVERTIME
+                            if (hasOvertime) {
+                                Text(
+                                    "OVERTIME",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Type", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(2f))
+                                    Text("OT Cost", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                }
+                                Divider()
+                                specificWorkers.filter { it.totalOvertimeCost > BigDecimal.ZERO }.forEach { row ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(row.workerTypeName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(2f))
+                                        Text("₹${row.totalOvertimeCost}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                    }
+                                    Divider()
+                                }
+                            }
+
+                            // ADVANCES
+                            if (specificAdvances.isNotEmpty()) {
+                                Text(
+                                    "ADVANCES",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Recipient", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(2f))
+                                    Text("Amount", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                }
+                                Divider()
+                                specificAdvances.forEach { row ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(2f)) {
+                                            Text(row.recipientName, style = MaterialTheme.typography.bodyMedium)
+                                            if (row.reason.isNotEmpty()) {
+                                                Text(row.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                                            }
+                                        }
+                                        Text("₹${row.totalAmount}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                    }
+                                    Divider()
+                                }
+                            }
+
+                            // SETTLEMENT
+                            if (specificSettlement > BigDecimal.ZERO) {
+                                Text(
+                                    "SETTLEMENT",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)
+                                )
+                                Divider()
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Weekly Settlement Done", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(2f))
+                                    Text("₹$specificSettlement", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                }
+                                Divider()
+                            }
+                        }
                     }
                 }
             }

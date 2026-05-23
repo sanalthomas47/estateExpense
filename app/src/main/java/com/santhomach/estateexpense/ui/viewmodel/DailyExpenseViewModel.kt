@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.santhomach.estateexpense.data.backup.DailyBackupManager
 import com.santhomach.estateexpense.data.model.*
 import com.santhomach.estateexpense.data.repository.ExpenseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,7 +20,8 @@ import kotlinx.serialization.builtins.ListSerializer
 @HiltViewModel
 class DailyExpenseViewModel @Inject constructor(
     private val repository: ExpenseRepository,
-    private val application: Application
+    private val application: Application,
+    private val dailyBackupManager: DailyBackupManager
 ) : ViewModel() {
 
     // UI State
@@ -535,7 +537,9 @@ class DailyExpenseViewModel @Inject constructor(
                 val expense = _currentExpense.value ?: throw IllegalStateException("No expense to save")
 
                 val id = if (expense.id == 0) {
-                    repository.insertDailyExpense(expense)
+                    val newId = repository.insertDailyExpense(expense)
+                    dailyBackupManager.maybeBackup()
+                    newId
                 } else {
                     repository.updateDailyExpense(expense)
                     expense.id.toLong()

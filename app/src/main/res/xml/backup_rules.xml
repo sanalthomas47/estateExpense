@@ -2,4 +2,5 @@
 <full-backup-content>
     <include domain="database" path="estate_expense.db"/>
     <include domain="file" path="receipts/"/>
+    <include domain="file" path="auto_backups/"/>
 </full-backup-content>

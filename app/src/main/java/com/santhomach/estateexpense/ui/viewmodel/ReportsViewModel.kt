@@ -2,6 +2,7 @@ package com.santhomach.estateexpense.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.santhomach.estateexpense.data.model.AdvanceEntry
 import com.santhomach.estateexpense.data.model.DailyExpense
 import com.santhomach.estateexpense.data.model.OtherExpenseEntry
 import com.santhomach.estateexpense.data.model.WorkerGroupEntry
@@ -29,7 +30,7 @@ class ReportsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ReportsUiState())
     val uiState: StateFlow<ReportsUiState> = _uiState.asStateFlow()
 
-    private val _dateRange = MutableStateFlow<DateRange>(DateRange.Last30Days)
+    private val _dateRange = MutableStateFlow<DateRange>(DateRange.CurrentWeek)
     val dateRange: StateFlow<DateRange> = _dateRange.asStateFlow()
 
     // Summary data flows
@@ -69,7 +70,7 @@ class ReportsViewModel @Inject constructor(
     // All expenses from the start of the current year
     val yearlyExpenses: StateFlow<List<DailyExpense>> = repository.getDailyExpensesByDateRangeFlow(
         LocalDate.now().withDayOfYear(1).format(DateTimeFormatter.ISO_LOCAL_DATE),
-        LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+        LocalDate.now().plusYears(10).format(DateTimeFormatter.ISO_LOCAL_DATE)
     ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Expenses filtered by current date range
@@ -163,6 +164,7 @@ class ReportsViewModel @Inject constructor(
     private fun getStartDate(range: DateRange): LocalDate {
         val today = LocalDate.now()
         return when (range) {
+            is DateRange.CurrentWeek -> today.with(DayOfWeek.MONDAY)
             is DateRange.Last7Days -> today.minusDays(7)
             is DateRange.Last30Days -> today.minusDays(30)
             is DateRange.Last90Days -> today.minusDays(90)
@@ -177,6 +179,7 @@ class ReportsViewModel @Inject constructor(
     private fun getEndDate(range: DateRange): LocalDate {
         val today = LocalDate.now()
         return when (range) {
+            is DateRange.CurrentWeek -> today.with(DayOfWeek.SATURDAY)
             is DateRange.Last7Days -> today
             is DateRange.Last30Days -> today
             is DateRange.Last90Days -> today
@@ -255,6 +258,64 @@ class ReportsViewModel @Inject constructor(
         return breakdownMap.values.sortedByDescending { it.totalAmount }
     }
 
+    fun getWeeklySpecificWorkers(expenses: List<DailyExpense>): List<WorkerTypeSpecific> {
+        val map = mutableMapOf<String, WorkerTypeSpecific>()
+        expenses.forEach { expense ->
+            try {
+                val groups = Json.decodeFromString(ListSerializer(WorkerGroupEntry.serializer()), expense.workerGroups)
+                groups.forEach { group ->
+                    val current = map.getOrDefault(group.workerTypeName, WorkerTypeSpecific(group.workerTypeName))
+                    val baseCost = group.wagePerDay * group.count.toBigDecimal()
+                    val otCost = group.overtimeWagePerHour * group.overtimeHours.toBigDecimal() * group.count.toBigDecimal()
+                    map[group.workerTypeName] = current.copy(
+                        totalCount = current.totalCount + group.count,
+                        totalBaseCost = current.totalBaseCost + baseCost,
+                        totalOvertimeCost = current.totalOvertimeCost + otCost
+                    )
+                }
+            } catch (_: Exception) {}
+        }
+        return map.values.sortedBy { it.workerTypeName }
+    }
+
+    fun getWeeklySpecificOtherExpenses(expenses: List<DailyExpense>): List<OtherExpenseSpecific> {
+        val map = mutableMapOf<String, OtherExpenseSpecific>()
+        expenses.forEach { expense ->
+            try {
+                val entries = Json.decodeFromString(ListSerializer(OtherExpenseEntry.serializer()), expense.otherExpenses)
+                entries.forEach { entry ->
+                    val key = "${entry.typeName}||${entry.subtypeName}"
+                    val current = map.getOrDefault(key, OtherExpenseSpecific(entry.typeName, entry.subtypeName))
+                    map[key] = current.copy(
+                        totalQuantity = current.totalQuantity + entry.quantity,
+                        totalAmount = current.totalAmount + entry.amount
+                    )
+                }
+            } catch (_: Exception) {}
+        }
+        return map.values.sortedBy { it.typeName }
+    }
+
+    fun getWeeklySpecificSettlement(expenses: List<DailyExpense>): java.math.BigDecimal =
+        expenses.fold(java.math.BigDecimal.ZERO) { acc, e -> acc + e.weeklyPaymentDone }
+
+    fun getWeeklySpecificAdvances(expenses: List<DailyExpense>): List<AdvanceSpecific> {
+        val map = mutableMapOf<Pair<String, String>, AdvanceSpecific>()
+        expenses.forEach { expense ->
+            try {
+                val entries = Json.decodeFromString(ListSerializer(AdvanceEntry.serializer()), expense.advanceEntries)
+                entries.forEach { entry ->
+                    val recipient = entry.recipientName.ifBlank { "General" }
+                    val reason = entry.reason
+                    val key = Pair(recipient, reason)
+                    val current = map.getOrDefault(key, AdvanceSpecific(recipient, reason))
+                    map[key] = current.copy(totalAmount = current.totalAmount + entry.amount)
+                }
+            } catch (_: Exception) {}
+        }
+        return map.values.sortedWith(compareBy({ it.recipientName }, { it.reason }))
+    }
+
     fun getWeeklyWorkerSummary(expenses: List<DailyExpense>): List<WorkerTypeSummary> {
         val summaryMap = mutableMapOf<Pair<String, String>, WorkerTypeSummary>()
 
@@ -289,6 +350,7 @@ data class ReportsUiState(
 )
 
 sealed class DateRange {
+    object CurrentWeek : DateRange()
     object Last7Days : DateRange()
     object Last30Days : DateRange()
     object Last90Days : DateRange()
@@ -320,4 +382,24 @@ data class WorkerTypeSummary(
     val comment: String,
     val totalCount: Int = 0,
     val totalCost: java.math.BigDecimal = java.math.BigDecimal.ZERO
+)
+
+data class WorkerTypeSpecific(
+    val workerTypeName: String,
+    val totalCount: Int = 0,
+    val totalBaseCost: java.math.BigDecimal = java.math.BigDecimal.ZERO,
+    val totalOvertimeCost: java.math.BigDecimal = java.math.BigDecimal.ZERO
+)
+
+data class OtherExpenseSpecific(
+    val typeName: String,
+    val subtypeName: String?,
+    val totalQuantity: Double = 0.0,
+    val totalAmount: java.math.BigDecimal = java.math.BigDecimal.ZERO
+)
+
+data class AdvanceSpecific(
+    val recipientName: String,
+    val reason: String,
+    val totalAmount: java.math.BigDecimal = java.math.BigDecimal.ZERO
 )
