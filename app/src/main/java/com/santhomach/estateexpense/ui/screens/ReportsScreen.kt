@@ -267,12 +267,12 @@ fun ReportsScreen(
                         )
 
                         val specificWorkers = viewModel.getWeeklySpecificWorkers(filteredExpenses)
-                        val specificOther = viewModel.getWeeklySpecificOtherExpenses(filteredExpenses)
+                        val individualOther = viewModel.getIndividualOtherExpenses(filteredExpenses)
                         val specificSettlement = viewModel.getWeeklySpecificSettlement(filteredExpenses)
                         val specificAdvances = viewModel.getWeeklySpecificAdvances(filteredExpenses)
                         val hasOvertime = specificWorkers.any { it.totalOvertimeCost > BigDecimal.ZERO }
 
-                        if (specificWorkers.isEmpty() && specificOther.isEmpty() && specificSettlement == BigDecimal.ZERO && specificAdvances.isEmpty()) {
+                        if (specificWorkers.isEmpty() && individualOther.isEmpty() && specificSettlement == BigDecimal.ZERO && specificAdvances.isEmpty()) {
                             Text("No data for this period", style = MaterialTheme.typography.bodyMedium)
                         } else {
                             // LABOR
@@ -306,8 +306,8 @@ fun ReportsScreen(
                                 }
                             }
 
-                            // OTHER EXPENSES
-                            if (specificOther.isNotEmpty()) {
+                            // OTHER EXPENSES — one row per entry
+                            if (individualOther.isNotEmpty()) {
                                 Text(
                                     "OTHER EXPENSES",
                                     style = MaterialTheme.typography.labelSmall,
@@ -323,21 +323,27 @@ fun ReportsScreen(
                                     Text("Amount", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
                                 }
                                 Divider()
-                                specificOther.forEach { row ->
+                                individualOther.forEach { (date, entry) ->
                                     Row(
                                         modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        val label = if (row.subtypeName != null) "${row.typeName} (${row.subtypeName})" else row.typeName
-                                        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(2f))
-                                        Text(
-                                            if (row.totalQuantity == row.totalQuantity.toLong().toDouble()) row.totalQuantity.toLong().toString() else String.format("%.1f", row.totalQuantity),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            modifier = Modifier.weight(0.6f),
-                                            textAlign = androidx.compose.ui.text.style.TextAlign.End
-                                        )
-                                        Text("₹${row.totalAmount}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                        Column(modifier = Modifier.weight(2f)) {
+                                            val label = if (entry.subtypeName != null) "${entry.typeName} (${entry.subtypeName})" else entry.typeName
+                                            Text(label, style = MaterialTheme.typography.bodyMedium)
+                                            val dateLabel = try {
+                                                java.time.LocalDate.parse(date)
+                                                    .format(java.time.format.DateTimeFormatter.ofPattern("dd MMM"))
+                                            } catch (_: Exception) { date }
+                                            Text(dateLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            if (entry.notes.isNotEmpty()) {
+                                                Text(entry.notes, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                                            }
+                                        }
+                                        val qtyStr = if (entry.quantity == entry.quantity.toLong().toDouble()) entry.quantity.toLong().toString() else String.format("%.1f", entry.quantity)
+                                        Text(qtyStr, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(0.6f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                        Text("₹${entry.amount}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
                                     }
                                     Divider()
                                 }
@@ -425,6 +431,23 @@ fun ReportsScreen(
                                 }
                                 Divider()
                             }
+
+                            // TOTALS
+                            val totalSalary = weeklySummary.totalLaborCost + weeklySummary.totalOvertimeCost
+                            val totalOtherExp = weeklySummary.totalOtherExpenses
+                            val totalPayments = weeklySummary.totalAdvanceAmount + weeklySummary.totalWeeklyPayment
+                            val totalIncome = weeklySummary.totalIncome
+                            HorizontalDivider(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp), thickness = 1.dp, color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                            Text(
+                                "TOTALS",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            TotalRow("Employee Salary (incl. OT)", "₹$totalSalary")
+                            TotalRow("Other Expenses", "₹$totalOtherExp")
+                            TotalRow("Total Payments (Advances + Settlement)", "₹$totalPayments")
+                            TotalRow("Total Income", "₹$totalIncome", highlight = true)
                         }
                     }
                 }
@@ -657,6 +680,26 @@ fun ReportsScreen(
             // Show snackbar
             viewModel.clearError()
         }
+    }
+}
+
+@Composable
+private fun TotalRow(label: String, value: String, highlight: Boolean = false) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall,
+            color = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 

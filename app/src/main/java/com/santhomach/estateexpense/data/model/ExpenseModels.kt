@@ -375,6 +375,25 @@ data class WeeklyFunds(
 )
 
 /**
+ * Vendor payments for pesticide/fertilizer credit purchases settled in bulk.
+ */
+@Entity(
+    tableName = "vendor_payments",
+    indices = [Index(value = ["date"])]
+)
+@Serializable
+data class VendorPayment(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+    val date: String,
+    @Serializable(with = BigDecimalSerializer::class)
+    val amount: BigDecimal,
+    val vendorName: String = "",
+    val notes: String = "",
+    val createdAt: String = LocalDateTime.now().toString()
+)
+
+/**
  * Worker payments (e.g., Monthly Manager Salary)
  */
 @Entity(

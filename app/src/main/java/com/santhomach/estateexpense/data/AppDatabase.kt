@@ -18,6 +18,7 @@ import com.santhomach.estateexpense.data.dao.ExcessBalanceDao
 import com.santhomach.estateexpense.data.dao.WorkTaskDao
 import com.santhomach.estateexpense.data.dao.WorkerPaymentDao
 import com.santhomach.estateexpense.data.dao.WeeklyFundsDao
+import com.santhomach.estateexpense.data.dao.VendorPaymentDao
 import com.santhomach.estateexpense.data.model.DailyExpense
 import com.santhomach.estateexpense.data.model.ExpenseType
 import com.santhomach.estateexpense.data.model.ExpenseSubtype
@@ -28,6 +29,7 @@ import com.santhomach.estateexpense.data.model.WeeklySettlement
 import com.santhomach.estateexpense.data.model.ExcessBalance
 import com.santhomach.estateexpense.data.model.WorkTask
 import com.santhomach.estateexpense.data.model.WorkerPayment
+import com.santhomach.estateexpense.data.model.VendorPayment
 import java.io.File
 
 @Database(
@@ -42,9 +44,10 @@ import java.io.File
         ExcessBalance::class,
         WorkTask::class,
         WorkerPayment::class,
-        com.santhomach.estateexpense.data.model.WeeklyFunds::class
+        com.santhomach.estateexpense.data.model.WeeklyFunds::class,
+        VendorPayment::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = true
 )
 @TypeConverters(RoomConverters::class)
@@ -61,9 +64,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun workTaskDao(): WorkTaskDao
     abstract fun workerPaymentDao(): WorkerPaymentDao
     abstract fun weeklyFundsDao(): WeeklyFundsDao
+    abstract fun vendorPaymentDao(): VendorPaymentDao
 
     companion object {
-        const val DATABASE_VERSION = 9
+        const val DATABASE_VERSION = 10
         private const val DATABASE_NAME = "estate_expense.db"
         private const val BACKUP_NAME = "pre_upgrade_backup.db"
 
@@ -79,7 +83,8 @@ abstract class AppDatabase : RoomDatabase() {
             "weekly_settlements",
             "excess_balances",
             "worker_payments",
-            "weekly_funds"
+            "weekly_funds",
+            "vendor_payments"
         )
 
         @Volatile
@@ -121,7 +126,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 DATABASE_NAME
             )
-                .addMigrations(MIGRATION_8_9)
+                .addMigrations(MIGRATION_8_9, MIGRATION_9_10)
                 .addCallback(AutoRestoreCallback(backupFile))
                 .build()
         }
@@ -250,6 +255,24 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "ALTER TABLE daily_expenses ADD COLUMN extraOvertimeAmount TEXT NOT NULL DEFAULT '0'"
+                )
+            }
+        }
+
+        private val MIGRATION_9_10 = object : androidx.room.migration.Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `vendor_payments` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `date` TEXT NOT NULL,
+                        `amount` TEXT NOT NULL,
+                        `vendorName` TEXT NOT NULL DEFAULT '',
+                        `notes` TEXT NOT NULL DEFAULT '',
+                        `createdAt` TEXT NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_vendor_payments_date` ON `vendor_payments` (`date`)"
                 )
             }
         }

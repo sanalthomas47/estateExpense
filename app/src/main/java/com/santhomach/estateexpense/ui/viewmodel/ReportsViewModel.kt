@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.santhomach.estateexpense.data.model.AdvanceEntry
 import com.santhomach.estateexpense.data.model.DailyExpense
 import com.santhomach.estateexpense.data.model.OtherExpenseEntry
+import com.santhomach.estateexpense.data.model.VendorPayment
 import com.santhomach.estateexpense.data.model.WorkerGroupEntry
 import com.santhomach.estateexpense.data.repository.ExpenseRepository
 import com.santhomach.estateexpense.data.repository.ExpenseSummary
@@ -62,6 +63,55 @@ class ReportsViewModel @Inject constructor(
         LocalDate.now().with(java.time.DayOfWeek.MONDAY).format(DateTimeFormatter.ISO_LOCAL_DATE),
         LocalDate.now().with(java.time.DayOfWeek.SATURDAY).format(DateTimeFormatter.ISO_LOCAL_DATE)
     ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExpenseSummary())
+
+    // Cumulative balance carried over from all weeks before the current one.
+    // Includes advances, weekly payments, and manual excess-balance entries so that
+    // nothing is lost until the running balance reaches zero.
+    val previousWeekCarryover: StateFlow<java.math.BigDecimal> = repository.getDailyExpensesByDateRangeFlow(
+        "1900-01-01",
+        LocalDate.now().with(java.time.DayOfWeek.MONDAY).minusDays(1)
+            .format(DateTimeFormatter.ISO_LOCAL_DATE)
+    ).map { expenses ->
+        val totalPaid = expenses.fold(java.math.BigDecimal.ZERO) { acc, r ->
+            acc + r.advanceAmount + r.weeklyPaymentDone + r.excessBalance
+        }
+        val totalExpense = expenses.fold(java.math.BigDecimal.ZERO) { acc, r ->
+            acc + r.totalLaborCost + r.totalOvertimeCost + r.totalOtherExpensesCost
+        }
+        totalPaid - totalExpense
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), java.math.BigDecimal.ZERO)
+
+    // Outstanding vendor balance: pesticide + fertilizer expenses minus recorded vendor payments
+    val vendorOutstanding: StateFlow<java.math.BigDecimal> = combine(
+        repository.getDailyExpensesByDateRangeFlow("1900-01-01", "2100-12-31"),
+        repository.getAllVendorPaymentsFlow()
+    ) { expenses, payments ->
+        val totalExpenses = expenses.fold(java.math.BigDecimal.ZERO) { acc, expense ->
+            acc + try {
+                Json.decodeFromString(ListSerializer(OtherExpenseEntry.serializer()), expense.otherExpenses)
+                    .filter {
+                        it.typeName.contains("Pesticide", ignoreCase = true) ||
+                        it.typeName.contains("Fertilizer", ignoreCase = true)
+                    }
+                    .fold(java.math.BigDecimal.ZERO) { a, e -> a + e.amount }
+            } catch (_: Exception) { java.math.BigDecimal.ZERO }
+        }
+        val totalPaid = payments.fold(java.math.BigDecimal.ZERO) { acc, p -> acc + p.amount }
+        (totalExpenses - totalPaid).coerceAtLeast(java.math.BigDecimal.ZERO)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), java.math.BigDecimal.ZERO)
+
+    fun recordVendorPayment(amount: java.math.BigDecimal, vendorName: String, notes: String, date: LocalDate) {
+        viewModelScope.launch {
+            repository.insertVendorPayment(
+                VendorPayment(
+                    date = date.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                    amount = amount,
+                    vendorName = vendorName,
+                    notes = notes
+                )
+            )
+        }
+    }
 
     // Recent expenses for detailed view
     val recentExpenses = repository.getRecentExpensesFlow(100)
@@ -294,6 +344,17 @@ class ReportsViewModel @Inject constructor(
             } catch (_: Exception) {}
         }
         return map.values.sortedBy { it.typeName }
+    }
+
+    fun getIndividualOtherExpenses(expenses: List<DailyExpense>): List<Pair<String, OtherExpenseEntry>> {
+        return expenses
+            .sortedBy { it.date }
+            .flatMap { expense ->
+                try {
+                    Json.decodeFromString(ListSerializer(OtherExpenseEntry.serializer()), expense.otherExpenses)
+                        .map { entry -> Pair(expense.date, entry) }
+                } catch (_: Exception) { emptyList() }
+            }
     }
 
     fun getWeeklySpecificSettlement(expenses: List<DailyExpense>): java.math.BigDecimal =

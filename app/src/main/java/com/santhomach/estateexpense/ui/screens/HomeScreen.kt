@@ -32,6 +32,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -82,6 +84,8 @@ fun HomeScreen(
     val weekSummary by actualViewModel.weekSummary.collectAsState()
     val yearSummary by actualViewModel.yearSummary.collectAsState()
     val allTimeSummary by actualViewModel.allTimeSummary.collectAsState()
+    val previousWeekCarryover by actualViewModel.previousWeekCarryover.collectAsState()
+    val vendorOutstanding by actualViewModel.vendorOutstanding.collectAsState()
     val uiState by actualViewModel.uiState.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -91,6 +95,7 @@ fun HomeScreen(
     var selectedExpenseForView by remember { mutableStateOf<DailyExpense?>(null) }
     var selectedImagePathForPreview by remember { mutableStateOf<String?>(null) }
     var expenseToClone by remember { mutableStateOf<DailyExpense?>(null) }
+    var showVendorPaymentDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.cloneSuccessDate) {
         val date = uiState.cloneSuccessDate ?: return@LaunchedEffect
@@ -159,12 +164,25 @@ fun HomeScreen(
         )
     }
 
+    if (showVendorPaymentDialog) {
+        RecordVendorPaymentDialog(
+            onDismiss = { showVendorPaymentDialog = false },
+            onConfirm = { amount, vendorName, notes, date ->
+                actualViewModel.recordVendorPayment(amount, vendorName, notes, date)
+                showVendorPaymentDialog = false
+                scope.launch { snackbarHostState.showSnackbar("Vendor payment recorded") }
+            }
+        )
+    }
+
     HomeScreenContent(
         recentExpenses = recentExpenses,
         dailySummary = dailySummary,
         weekSummary = weekSummary,
         yearSummary = yearSummary,
         allTimeSummary = allTimeSummary,
+        previousWeekCarryover = previousWeekCarryover,
+        vendorOutstanding = vendorOutstanding,
         snackbarHostState = snackbarHostState,
         onNavigateToExpenseEntry = onNavigateToExpenseEntry,
         onNavigateToReports = onNavigateToReports,
@@ -175,7 +193,8 @@ fun HomeScreen(
         onNavigateToExpenseTypeSummary = onNavigateToExpenseTypeSummary,
         onShowDatePicker = { showDatePicker = true },
         onViewExpense = { selectedExpenseForView = it },
-        onLongPressExpense = { expenseToClone = it }
+        onLongPressExpense = { expenseToClone = it },
+        onRecordVendorPayment = { showVendorPaymentDialog = true }
     )
 }
 
@@ -187,6 +206,8 @@ fun HomeScreenContent(
     weekSummary: ExpenseSummary,
     yearSummary: ExpenseSummary,
     allTimeSummary: ExpenseSummary,
+    previousWeekCarryover: java.math.BigDecimal = java.math.BigDecimal.ZERO,
+    vendorOutstanding: java.math.BigDecimal = java.math.BigDecimal.ZERO,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onNavigateToExpenseEntry: (LocalDate, Int?) -> Unit,
     onNavigateToReports: () -> Unit,
@@ -197,7 +218,8 @@ fun HomeScreenContent(
     onNavigateToExpenseTypeSummary: () -> Unit = {},
     onShowDatePicker: () -> Unit = {},
     onViewExpense: (DailyExpense) -> Unit = {},
-    onLongPressExpense: (DailyExpense) -> Unit = {}
+    onLongPressExpense: (DailyExpense) -> Unit = {},
+    onRecordVendorPayment: () -> Unit = {}
 ) {
     val grouped = remember(recentExpenses) {
         recentExpenses
@@ -282,8 +304,18 @@ fun HomeScreenContent(
                     PerformanceHeroCard(
                         weekSummary = weekSummary,
                         yearSummary = yearSummary,
-                        allTimeSummary = allTimeSummary
+                        allTimeSummary = allTimeSummary,
+                        previousWeekCarryover = previousWeekCarryover
                     )
+                }
+
+                if (vendorOutstanding > java.math.BigDecimal.ZERO) {
+                    item {
+                        VendorOutstandingCard(
+                            outstanding = vendorOutstanding,
+                            onRecordPayment = onRecordVendorPayment
+                        )
+                    }
                 }
 
                 item {
@@ -355,10 +387,12 @@ fun HomeScreenContent(
 private fun PerformanceHeroCard(
     weekSummary: ExpenseSummary,
     yearSummary: ExpenseSummary,
-    allTimeSummary: ExpenseSummary
+    allTimeSummary: ExpenseSummary,
+    previousWeekCarryover: java.math.BigDecimal = java.math.BigDecimal.ZERO
 ) {
     val weekExpense = weekSummary.totalLaborCost + weekSummary.totalOvertimeCost + weekSummary.totalOtherExpenses
-    val weekBalance = (weekSummary.totalAdvanceAmount + weekSummary.totalWeeklyPayment) - weekExpense
+    // Include this week's excess-balance entries and the carry-over from all prior weeks
+    val weekBalance = (weekSummary.totalAdvanceAmount + weekSummary.totalWeeklyPayment + weekSummary.totalExcessBalance) - weekExpense + previousWeekCarryover
     val yearExpense = yearSummary.totalLaborCost + yearSummary.totalOvertimeCost + yearSummary.totalOtherExpenses
     val allExpense = allTimeSummary.totalLaborCost + allTimeSummary.totalOvertimeCost + allTimeSummary.totalOtherExpenses
 
@@ -877,6 +911,116 @@ private fun EmptyStateCard(onClick: () -> Unit) {
             }
         }
     }
+}
+
+// ─── Vendor outstanding card ──────────────────────────────────────────────────
+
+@Composable
+private fun VendorOutstandingCard(
+    outstanding: java.math.BigDecimal,
+    onRecordPayment: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.75f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "Vendor Bills Outstanding",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                )
+                Text(
+                    text = "₹$outstanding",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Text(
+                    text = "Pesticides & Fertilizers",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.6f)
+                )
+            }
+            OutlinedButton(
+                onClick = onRecordPayment,
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                ),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp, MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.5f)
+                )
+            ) {
+                Text("Record Payment")
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecordVendorPaymentDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (amount: java.math.BigDecimal, vendorName: String, notes: String, date: LocalDate) -> Unit
+) {
+    var amountText by remember { mutableStateOf("") }
+    var vendorName by remember { mutableStateOf("") }
+    var notes by remember { mutableStateOf("") }
+    val isValid = amountText.toBigDecimalOrNull()?.let { it > java.math.BigDecimal.ZERO } == true
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Payments, contentDescription = null) },
+        title = { Text("Record Vendor Payment") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = { Text("Amount Paid (₹)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = vendorName,
+                    onValueChange = { vendorName = it },
+                    label = { Text("Vendor Name (optional)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Notes (optional)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val amount = amountText.toBigDecimalOrNull() ?: return@Button
+                    onConfirm(amount, vendorName.trim(), notes.trim(), LocalDate.now())
+                },
+                enabled = isValid
+            ) { Text("Record") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 // ─── Expense detail dialog ────────────────────────────────────────────────────

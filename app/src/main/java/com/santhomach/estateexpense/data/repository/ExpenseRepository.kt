@@ -25,6 +25,7 @@ class ExpenseRepository @Inject constructor(
     private val taskDao = database.workTaskDao()
     private val paymentDao = database.workerPaymentDao()
     private val fundsDao = database.weeklyFundsDao()
+    private val vendorPaymentDao = database.vendorPaymentDao()
 
     // Daily Expense Operations
     suspend fun insertDailyExpense(expense: DailyExpense): Long {
@@ -290,6 +291,11 @@ class ExpenseRepository @Inject constructor(
         return fundsDao.getAllFlow()
     }
 
+    // Vendor Payment Operations
+    suspend fun insertVendorPayment(payment: VendorPayment): Long = vendorPaymentDao.insert(payment)
+    suspend fun deleteVendorPayment(payment: VendorPayment) = vendorPaymentDao.delete(payment)
+    fun getAllVendorPaymentsFlow(): Flow<List<VendorPayment>> = vendorPaymentDao.getAllFlow()
+
     // Analytics and Reports
     fun getDailyExpenseSummaryFlow(startDate: String, endDate: String): Flow<ExpenseSummary> {
         return getDailyExpensesByDateRangeFlow(startDate, endDate).map { expenses ->
@@ -310,7 +316,17 @@ class ExpenseRepository @Inject constructor(
     }
 
     fun getWeeklyExpenseSummaryFlow(startDate: String, endDate: String): Flow<WeeklyExpenseSummary> {
+        // Compute weeks from the actual calendar range, not from the number of expense records.
+        // Use ceiling division so a partial week still counts as 1.
+        val weeks = try {
+            val start = java.time.LocalDate.parse(startDate)
+            val end = java.time.LocalDate.parse(endDate)
+            val days = java.time.temporal.ChronoUnit.DAYS.between(start, end.plusDays(1))
+            ((days + 6) / 7).toInt().coerceAtLeast(1)
+        } catch (_: Exception) { 1 }
+
         return getDailyExpenseSummaryFlow(startDate, endDate).map { dailySummary ->
+            val weeksBD = weeks.toBigDecimal()
             WeeklyExpenseSummary(
                 totalIncome = dailySummary.totalIncome,
                 totalLaborCost = dailySummary.totalLaborCost,
@@ -320,9 +336,9 @@ class ExpenseRepository @Inject constructor(
                 totalWeeklyPayment = dailySummary.totalWeeklyPayment,
                 totalExcessBalance = dailySummary.totalExcessBalance,
                 netAmount = dailySummary.netAmount,
-                totalWeeks = (dailySummary.totalDays / 7).coerceAtLeast(1),
-                averageWeeklyIncome = dailySummary.totalIncome / (dailySummary.totalDays / 7).coerceAtLeast(1).toBigDecimal(),
-                averageWeeklyExpense = (dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses + dailySummary.totalAdvanceAmount + dailySummary.totalWeeklyPayment - dailySummary.totalExcessBalance).coerceAtLeast(BigDecimal.ZERO) / (dailySummary.totalDays / 7).coerceAtLeast(1).toBigDecimal()
+                totalWeeks = weeks,
+                averageWeeklyIncome = dailySummary.totalIncome / weeksBD,
+                averageWeeklyExpense = (dailySummary.totalLaborCost + dailySummary.totalOvertimeCost + dailySummary.totalOtherExpenses) / weeksBD
             )
         }
     }
